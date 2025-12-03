@@ -10,30 +10,78 @@ from storage import Storage
 BASE_DIR = pathlib.Path(__file__).resolve().parent
 DATA_DIR = BASE_DIR / "data"
 
-st.set_page_config(page_title="StudyPlanTracker", page_icon="📚", layout="wide", initial_sidebar_state="collapsed")
+# 1. SETUP: Keep sidebar 'expanded' so the HTML exists, but we hide it with CSS
+st.set_page_config(page_title="StudyPlanTracker", page_icon="📚", layout="wide", initial_sidebar_state="expanded")
 
 css = """
 <style>
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
 
 * { font-family: 'Inter', sans-serif; }
 
-/* 1. HIDE DEFAULT STREAMLIT NAV */
+/* 1. HIDE DEFAULT ELEMENTS */
 [data-testid="stSidebarNav"] { display: none !important; }
+[data-testid="stHeader"] { display: none !important; }
+footer { display: none !important; }
+/* Hide the default arrow button because we use hover now */
+[data-testid="collapsedControl"] { display: none !important; }
 
-/* 2. STYLE THE SIDEBAR */
-[data-testid="stSidebar"] {
-    background-color: #ffffff;
+/* 2. THE FLOATING SIDEBAR MAGIC */
+section[data-testid="stSidebar"] {
+    /* Fixed Position: Floats over the content */
+    position: fixed !important; 
+    top: 0;
+    left: 0;
+    height: 100vh;
+    z-index: 100000; /* High z-index to sit on top of everything */
+
+    /* Dimensions */
+    width: 300px !important;
+    min-width: 300px !important;
+
+    /* Animation Logic */
+    transform: translateX(-285px); /* Move 285px to the left, leaving a 15px strip */
+    transition: transform 0.4s cubic-bezier(0.25, 1, 0.5, 1); /* Smooth 'ease-out' slide */
+
+    /* Visual Styling */
+    background-color: rgba(255, 255, 255, 0.95);
+    backdrop-filter: blur(10px);
     border-right: 1px solid #e2e8f0;
+    box-shadow: 4px 0 15px rgba(0,0,0,0.05);
 }
 
-/* 3. STYLE THE MAIN AREA */
+/* 3. HOVER TRIGGER */
+/* When mouse touches the sidebar (the 15px strip), slide it back to 0 */
+section[data-testid="stSidebar"]:hover {
+    transform: translateX(0);
+    box-shadow: 10px 0 30px rgba(0,0,0,0.1);
+}
+
+/* 4. VISUAL HINT (Optional) */
+/* Adds a thin blue line on the left so user knows something is there */
+section[data-testid="stSidebar"]::after {
+    content: "";
+    position: absolute;
+    right: 0;
+    top: 0;
+    height: 100%;
+    width: 4px;
+    background: linear-gradient(to bottom, transparent, #6366f1, transparent);
+    opacity: 0.5;
+}
+
+/* 5. ADJUST MAIN CONTENT */
+/* Since sidebar is floating, we need to ensure main content isn't hidden behind the strip */
 [data-testid="stAppViewContainer"] {
+    margin-left: 0 !important;
+    width: 100% !important;
     background-color: #f8fafc;
+    background-image: radial-gradient(at 0% 0%, #e0e7ff 0%, transparent 50%), 
+                      radial-gradient(at 100% 100%, #f3e8ff 0%, transparent 50%);
 }
 
-/* 4. CUSTOM BUTTONS IN SIDEBAR */
-/* This makes the sidebar buttons look like menu items */
+/* --- PREVIOUS STYLES BELOW --- */
+
 .stButton button {
     background-color: transparent !important;
     color: #64748b !important;
@@ -50,7 +98,6 @@ css = """
     padding-left: 10px !important;
 }
 
-/* 5. METRIC CARDS FOR HOME */
 div[data-testid="metric-container"] {
     background-color: #ffffff;
     border: 1px solid #e2e8f0;
@@ -59,13 +106,37 @@ div[data-testid="metric-container"] {
     box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
 }
 
-div[data-testid="metric-container"] label {
-    color: #64748b;
+/* Auth Page Styles */
+.hero-title {
+    font-size: 3.5rem;
+    font-weight: 800;
+    color: #1e293b;
+    line-height: 1.1;
+    margin-bottom: 0.5rem;
 }
-
-div[data-testid="metric-container"] div[data-testid="stMetricValue"] {
-    color: #0f172a;
-    font-weight: 700;
+.hero-gradient {
+    background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+}
+.hero-sub {
+    font-size: 1.2rem;
+    color: #64748b;
+    margin-bottom: 2rem;
+    line-height: 1.6;
+}
+[data-testid="stForm"] {
+    background-color: white;
+    padding: 2.5rem;
+    border-radius: 20px;
+    box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
+    border: 1px solid #e2e8f0;
+}
+div[data-testid="stAlert"] {
+    border-radius: 12px;
+    border: none;
+    box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05);
+    background-color: white;
 }
 </style>
 """
@@ -105,31 +176,38 @@ def login_action(email, pwd):
 
 
 def auth_page():
-    mode = st.session_state.get("auth_mode", "login")
+    st.markdown("<div style='height: 5vh;'></div>", unsafe_allow_html=True)
+    col1, spacer, col2 = st.columns([1.5, 0.2, 1])
 
-    # Create 3 columns to center the content
-    col1, col2, col3 = st.columns([1, 2, 1])
+    with col1:
+        st.markdown("""
+            <div class="hero-title">
+                Master Your <br>
+                <span class="hero-gradient">Learning Journey</span>
+            </div>
+            <div class="hero-sub">
+                Stop guessing what to study. Let AI organize your schedule, 
+                track your progress, and help you achieve your goals.
+            </div>
+        """, unsafe_allow_html=True)
+
+        st.info("**AI Assistant** answers your doubts instantly", icon="🤖")
+        st.success("**Visual Analytics** to track your growth", icon="📊")
+        st.warning("**Smart Planner** for maximum productivity", icon="⚡")
 
     with col2:
-        # Spacer to push content down slightly
-        st.markdown("<div style='height: 50px;'></div>", unsafe_allow_html=True)
+        mode = st.session_state.get("auth_mode", "login")
 
-        # Header Section
         if mode == "login":
-            st.markdown('<div class="auth-header">Welcome Back</div>', unsafe_allow_html=True)
-            st.markdown('<div class="auth-sub">Enter your details to access your study plan</div>',
-                        unsafe_allow_html=True)
+            st.subheader("Welcome Back 👋")
+            st.caption("Enter your details to access your dashboard")
 
             with st.form("login_form"):
                 email = st.text_input("Email", key="login_email", placeholder="student@example.com")
                 pwd = st.text_input("Password", type="password", key="login_pwd", placeholder="••••••••")
-
-                # Checkbox and Forgot Password Link
-                c1, c2 = st.columns([1, 1])
-                with c1:
-                    remember = st.checkbox("Remember me")
-
-                submitted = st.form_submit_button("Sign In")
+                remember = st.checkbox("Remember me")
+                st.markdown("<br>", unsafe_allow_html=True)
+                submitted = st.form_submit_button("Sign In", use_container_width=True)
 
             if submitted:
                 ok, msg = login_action(email, pwd)
@@ -139,24 +217,25 @@ def auth_page():
                 else:
                     st.error(msg)
 
-            # Switcher
-            st.markdown('<div class="auth-toggle-text">New here?</div>', unsafe_allow_html=True)
-            if st.button("Create an Account", type="secondary", use_container_width=True):
+            st.markdown("---")
+            col_txt, col_btn = st.columns([1.5, 1])
+            col_txt.markdown('<div style="margin-top: 8px; color: #64748b;">New here?</div>', unsafe_allow_html=True)
+            if col_btn.button("Create Account", type="secondary", use_container_width=True):
                 st.session_state.auth_mode = "signup"
                 st.rerun()
 
-        else:  # Signup Mode
-            st.markdown('<div class="auth-header">Create Account</div>', unsafe_allow_html=True)
-            st.markdown('<div class="auth-sub">Start tracking your productivity today</div>', unsafe_allow_html=True)
+        else:
+            st.subheader("Create Account 🚀")
+            st.caption("Start your journey to better grades")
 
             with st.form("signup_form"):
                 email = st.text_input("Email", key="signup_email", placeholder="name@example.com")
                 pwd = st.text_input("Password", type="password", key="signup_pwd", placeholder="Min 8 chars")
                 pwd2 = st.text_input("Confirm Password", type="password", key="signup_pwd2",
                                      placeholder="Repeat password")
-
                 agree = st.checkbox("I agree to the Terms & Privacy")
-                submitted = st.form_submit_button("Create Account")
+                st.markdown("<br>", unsafe_allow_html=True)
+                submitted = st.form_submit_button("Create Account", use_container_width=True)
 
             if submitted:
                 if not agree:
@@ -169,16 +248,17 @@ def auth_page():
                     else:
                         st.error(msg)
 
-            # Switcher
-            st.markdown('<div class="auth-toggle-text">Already have an account?</div>', unsafe_allow_html=True)
-            if st.button("Log In Instead", type="secondary", use_container_width=True):
+            st.markdown("---")
+            col_txt, col_btn = st.columns([1.5, 1])
+            col_txt.markdown('<div style="margin-top: 8px; color: #64748b;">Already have an account?</div>',
+                             unsafe_allow_html=True)
+            if col_btn.button("Log In", type="secondary", use_container_width=True):
                 st.session_state.auth_mode = "login"
                 st.rerun()
 
 
 def render_sidebar(user):
     with st.sidebar:
-        # --- Logo & User Info ---
         st.markdown(f"""
             <div style="margin-bottom: 30px; text-align: center;">
                 <div style="font-size: 40px; margin-bottom: 10px;">📚</div>
@@ -190,8 +270,6 @@ def render_sidebar(user):
             </div>
         """, unsafe_allow_html=True)
 
-        # --- Navigation ---
-        # We use a standard dictionary for menu items
         menu = {
             "Home": "🏠",
             "Add Plan": "➕",
@@ -206,17 +284,14 @@ def render_sidebar(user):
         current_page = st.session_state.get("page", "Home")
 
         for page_name, icon in menu.items():
-            # If the button is clicked, update state and rerun
-            # We highlight the button if it's the current page (simulated via formatting)
             label = f"{icon}  {page_name}"
             if page_name == current_page:
-                label = f"🔵  {page_name}"  # active indicator
+                label = f"🔵  {page_name}"
 
             if st.button(label, key=f"nav_{page_name}", use_container_width=True):
                 st.session_state.page = page_name
                 st.rerun()
 
-        # --- Logout Section ---
         st.markdown("---")
         if st.button("🚪 Logout", use_container_width=True):
             st.session_state.clear()
@@ -226,16 +301,13 @@ def render_sidebar(user):
 def home_page():
     user = st.session_state.get("user")
 
-    # 1. Header Section
     st.markdown(f"""
         <h1 style='font-size: 2.5rem; margin-bottom: 0;'>Hello, {user.get("email").split('@')[0].title()} 👋</h1>
         <p style='color: #64748b; margin-bottom: 40px;'>Here is your daily activity overview.</p>
     """, unsafe_allow_html=True)
 
-    # 2. Stats Grid using Native Columns
     col1, col2, col3 = st.columns(3)
 
-    # Calculate stats (mock data or real)
     logs = storage.read_csv("study_logs.csv")
     uid = user.get("user_id")
 
@@ -251,17 +323,14 @@ def home_page():
     with col3:
         st.metric("Pending Plans", "2", delta="-1 from yesterday", delta_color="inverse")
 
-    # 3. Recent Activity Section
     st.markdown("### 📅 Recent Study Plans", unsafe_allow_html=True)
 
     plans = storage.read_csv("study_plans.csv")
     if plans is not None and not plans.empty:
-        user_plans = plans[plans["user_id"] == uid].tail(3)  # Get last 3
+        user_plans = plans[plans["user_id"] == uid].tail(3)
 
-        # Create a clean DataFrame view or custom cards
         for index, row in user_plans.iterrows():
             with st.container():
-                # Styled Card for each plan
                 st.markdown(f"""
                 <div style="background: white; padding: 16px; border-radius: 12px; border: 1px solid #e2e8f0; margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center;">
                     <div>
