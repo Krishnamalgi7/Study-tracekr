@@ -78,7 +78,7 @@ div[data-testid="stSidebarUserContent"] {
 .logout-container {
     margin-top: 50px; /* Standard spacing */
     width: 100%;      /* Full width */
-    
+
     /* ADD THESE 2 LINES: */
     border-top: 1px solid #e2e8f0;  /* This creates the line */
     padding-top: 15px;              /* Space BELOW the line */
@@ -161,75 +161,115 @@ def login_action(email, pwd):
 
 
 def auth_page():
-    st.markdown("<div style='height: 5vh;'></div>", unsafe_allow_html=True)
-    col1, spacer, col2 = st.columns([1.5, 0.2, 1])
+    # --- CSS: REMOVE PADDING & ADJUST LAYOUT ---
+    st.markdown("""
+        <style>
+            /* Remove default top padding to prevent scrolling */
+            .block-container {
+                padding-top: 1rem !important;
+                padding-bottom: 1rem !important;
+            }
+            /* Ensure the title is tight against the top */
+            h1 { padding-top: 0rem !important; }
+        </style>
+    """, unsafe_allow_html=True)
+
+    # --- HEADER ---
+    st.markdown("""
+        <div style="text-align: center; margin-bottom: 30px;">
+            <div style="font-size: 32px; margin-bottom: 0px;">🎓</div>
+            <h1 style="font-size: 2.8rem; font-weight: 800; color: #1e293b; margin: 0;">
+                Study Tracker <span style="color: #6366f1;">with AI</span>
+            </h1>
+        </div>
+    """, unsafe_allow_html=True)
+
+    # --- MAIN COLUMNS ---
+    # Changed ratio: Left side (5) is now much wider than Right side (3)
+    # Added gap="large" for better visual separation without using a spacer column
+    col1, col2 = st.columns([5, 3], gap="large")
+
     with col1:
+        # Increased font size back to 2.8rem (bigger) since we have more width now
         st.markdown("""
-            <div class="hero-title">
-                Master Your <br>
-                <span class="hero-gradient">Learning Journey</span>
-            </div>
-            <div class="hero-sub">
-                Stop guessing what to study. Let AI organize your schedule, 
-                track your progress, and help you achieve your goals.
+            <div style="margin-top: 10px;">
+                <h2 style="font-size: 2.5rem; font-weight: 800; line-height: 1.1; color: #1e293b; margin-bottom: 15px;">
+                    Master Your <br>
+                    <span style="color: #6366f1;">Learning Journey</span>
+                </h2>
+                <p style="font-size: 1.1rem; color: #64748b; margin-bottom: 25px; line-height: 1.4;">
+                    Stop guessing what to study. Let AI organize your schedule, 
+                    track your progress, and help you achieve your goals.
+                </p>
             </div>
         """, unsafe_allow_html=True)
-        st.info("**AI Assistant** answers your doubts instantly", icon="🤖")
-        st.success("**Visual Analytics** to track your growth", icon="📊")
-        st.warning("**Smart Planner** for maximum productivity", icon="⚡")
+
+        # Feature Highlights (Compact but readable)
+        st.markdown("""
+        <div style="display: flex; gap: 10px; flex-direction: column;">
+            <div style="background-color:#f0f9ff; padding:12px; border-radius:8px; border-left: 5px solid #0ea5e9;">
+                🤖 <strong>AI Assistant</strong> answers doubts instantly
+            </div>
+            <div style="background-color:#f0fdf4; padding:12px; border-radius:8px; border-left: 5px solid #22c55e;">
+                📊 <strong>Visual Analytics</strong> track your growth
+            </div>
+            <div style="background-color:#fff7ed; padding:12px; border-radius:8px; border-left: 5px solid #f97316;">
+                ⚡ <strong>Smart Planner</strong> for productivity
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
 
     with col2:
         mode = st.session_state.get("auth_mode", "login")
-        if mode == "login":
-            st.subheader("Welcome Back 👋")
-            st.caption("Enter your details to access your dashboard")
-            with st.form("login_form"):
-                email = st.text_input("Email", key="login_email", placeholder="student@example.com")
-                pwd = st.text_input("Password", type="password", key="login_pwd", placeholder="••••••••")
-                remember = st.checkbox("Remember me")
-                st.markdown("<br>", unsafe_allow_html=True)
-                submitted = st.form_submit_button("Sign In", use_container_width=True)
-            if submitted:
-                ok, msg = login_action(email, pwd)
-                if ok:
-                    st.success(msg); st.rerun()
-                else:
-                    st.error(msg)
-            st.markdown("---")
-            col_txt, col_btn = st.columns([1.5, 1])
-            col_txt.markdown('<div style="margin-top: 8px; color: #64748b;">New here?</div>', unsafe_allow_html=True)
-            if col_btn.button("Create Account", type="secondary", use_container_width=True):
-                st.session_state.auth_mode = "signup"
-                st.rerun()
-        else:
-            st.subheader("Create Account 🚀")
-            st.caption("Start your journey to better grades")
-            with st.form("signup_form"):
-                email = st.text_input("Email", key="signup_email", placeholder="name@example.com")
-                pwd = st.text_input("Password", type="password", key="signup_pwd", placeholder="Min 8 chars")
-                pwd2 = st.text_input("Confirm Password", type="password", key="signup_pwd2",
-                                     placeholder="Repeat password")
-                agree = st.checkbox("I agree to the Terms & Privacy")
-                st.markdown("<br>", unsafe_allow_html=True)
-                submitted = st.form_submit_button("Create Account", use_container_width=True)
-            if submitted:
-                if not agree:
-                    st.error("Please agree to the terms")
-                else:
-                    ok, msg = register_action(email, pwd, pwd2)
+
+        # Added a card-like effect for the login form
+        with st.container(border=True):
+            if mode == "login":
+                st.subheader("Sign In")
+                with st.form("login_form"):
+                    email = st.text_input("Email", key="login_email")
+                    pwd = st.text_input("Password", type="password", key="login_pwd")
+                    submitted = st.form_submit_button("Sign In", use_container_width=True)
+
+                if submitted:
+                    ok, msg = login_action(email, pwd)
                     if ok:
-                        st.success(msg); st.rerun()
+                        st.success(msg);
+                        st.rerun()
                     else:
                         st.error(msg)
-            st.markdown("---")
-            col_txt, col_btn = st.columns([1.5, 1])
-            col_txt.markdown('<div style="margin-top: 8px; color: #64748b;">Already have an account?</div>',
-                             unsafe_allow_html=True)
-            if col_btn.button("Log In", type="secondary", use_container_width=True):
-                st.session_state.auth_mode = "login"
-                st.rerun()
 
+                st.markdown("---")
+                c1, c2 = st.columns([1.5, 1])
+                c1.markdown("<div style='padding-top: 8px; font-size: 0.9rem; color: #64748b'>New here?</div>",
+                            unsafe_allow_html=True)
+                if c2.button("Sign Up", type="secondary", use_container_width=True):
+                    st.session_state.auth_mode = "signup"
+                    st.rerun()
 
+            else:
+                st.subheader("Create Account")
+                with st.form("signup_form"):
+                    email = st.text_input("Email", key="signup_email")
+                    pwd = st.text_input("Password", type="password", key="signup_pwd")
+                    pwd2 = st.text_input("Confirm", type="password", key="signup_pwd2")
+                    submitted = st.form_submit_button("Register", use_container_width=True)
+
+                if submitted:
+                    ok, msg = register_action(email, pwd, pwd2)
+                    if ok:
+                        st.success(msg);
+                        st.rerun()
+                    else:
+                        st.error(msg)
+
+                st.markdown("---")
+                c1, c2 = st.columns([1.5, 1])
+                c1.markdown("<div style='padding-top: 8px; font-size: 0.9rem; color: #64748b'>Existing user?</div>",
+                            unsafe_allow_html=True)
+                if c2.button("Log In", type="secondary", use_container_width=True):
+                    st.session_state.auth_mode = "login"
+                    st.rerun()
 def render_sidebar(user):
     with st.sidebar:
         st.markdown(f"""
