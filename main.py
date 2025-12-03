@@ -1,182 +1,321 @@
+from dotenv import load_dotenv
+
+load_dotenv()
 import streamlit as st
 import importlib
 import pathlib
-from datetime import datetime
-from dotenv import load_dotenv
-
-load_dotenv()  # Load .env on startup
+from auth import Auth
+from storage import Storage
 
 BASE_DIR = pathlib.Path(__file__).resolve().parent
 DATA_DIR = BASE_DIR / "data"
 
-from auth import Auth
-from storage import Storage
-
-st.set_page_config(page_title="Study Plan Tracker", page_icon="📚", layout="wide", initial_sidebar_state="expanded")
+st.set_page_config(page_title="StudyPlanTracker", page_icon="📚", layout="wide", initial_sidebar_state="collapsed")
 
 css = """
 <style>
-:root{
-  --bg:#0f1724;
-  --card:#0b1220;
-  --accent:#7c3aed;
-  --muted:#94a3b8;
-  --glass: rgba(255,255,255,0.03);
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+
+* { font-family: 'Inter', sans-serif; }
+
+/* 1. HIDE DEFAULT STREAMLIT NAV */
+[data-testid="stSidebarNav"] { display: none !important; }
+
+/* 2. STYLE THE SIDEBAR */
+[data-testid="stSidebar"] {
+    background-color: #ffffff;
+    border-right: 1px solid #e2e8f0;
 }
-html,body,#root{
-  background: linear-gradient(180deg,#02111a 0%, #041426 50%, #02111a 100%) !important;
-  color: #e6eef8;
+
+/* 3. STYLE THE MAIN AREA */
+[data-testid="stAppViewContainer"] {
+    background-color: #f8fafc;
 }
-header {display:none}
-.section-card{
-  background:linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));
-  border-radius:18px;
-  padding:18px;
-  box-shadow: 0 6px 18px rgba(2,6,23,0.6);
-  border: 1px solid rgba(255,255,255,0.03);
+
+/* 4. CUSTOM BUTTONS IN SIDEBAR */
+/* This makes the sidebar buttons look like menu items */
+.stButton button {
+    background-color: transparent !important;
+    color: #64748b !important;
+    border: none !important;
+    text-align: left !important;
+    padding-left: 0 !important;
+    font-weight: 500 !important;
+    transition: all 0.2s;
 }
-.brand{
-  display:flex;
-  gap:12px;
-  align-items:center;
+
+.stButton button:hover {
+    color: #6366f1 !important;
+    background-color: #f1f5f9 !important;
+    padding-left: 10px !important;
 }
-.brand .logo{
-  width:54px;height:54px;border-radius:12px;
-  background:linear-gradient(135deg, var(--accent), #60a5fa);
-  display:flex;align-items:center;justify-content:center;font-weight:800;font-size:22px;color:white;
-  box-shadow:0 6px 30px rgba(124,58,237,0.24);
+
+/* 5. METRIC CARDS FOR HOME */
+div[data-testid="metric-container"] {
+    background-color: #ffffff;
+    border: 1px solid #e2e8f0;
+    padding: 20px;
+    border-radius: 12px;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
 }
-.menu-card{padding:14px;border-radius:12px;background:linear-gradient(180deg, rgba(255,255,255,0.01), rgba(255,255,255,0.02));}
-.small{font-size:13px;color:var(--muted)}
-.huge{font-size:28px;font-weight:700}
-.btn-primary{
-  background: linear-gradient(90deg,var(--accent), #60a5fa) !important;
-  border-radius:10px !important;
-  color:white !important;
-  padding:8px 14px !important;
-  box-shadow:0 6px 18px rgba(96,165,250,0.12) !important;
+
+div[data-testid="metric-container"] label {
+    color: #64748b;
 }
-.footer{color:var(--muted);font-size:13px;padding-top:18px}
-.badge{
-  background:rgba(255,255,255,0.04);
-  padding:6px 10px;border-radius:999px;font-weight:600;color:#cbd5e1;font-size:13px;
-  border:1px solid rgba(255,255,255,0.02)
+
+div[data-testid="metric-container"] div[data-testid="stMetricValue"] {
+    color: #0f172a;
+    font-weight: 700;
 }
 </style>
 """
+
 st.markdown(css, unsafe_allow_html=True)
 
 storage = Storage(DATA_DIR)
 storage.ensure_all_files_exist()
 auth = Auth(storage)
 
-def render_header():
-    col1, col2 = st.columns([1,3])
-    with col1:
-        st.markdown(
-            """
-            <div class="brand">
-              <div class="logo">SP</div>
-              <div>
-                <div style="font-size:18px;font-weight:700">StudyPlanTracker</div>
-                <div class="small">Focus • Track • Improve</div>
-              </div>
+
+def register_action(email, pwd, pwd2):
+    if not email or not pwd:
+        return False, "Email and password required"
+    if pwd != pwd2:
+        return False, "Passwords do not match"
+    ok = auth.register(email, pwd)
+    if not ok:
+        return False, "Account already exists"
+    user = auth.login(email, pwd)
+    if user:
+        st.session_state.user = user
+        st.session_state.page = "Home"
+        return True, "Account created successfully!"
+    return False, "Registration failed"
+
+
+def login_action(email, pwd):
+    if not email or not pwd:
+        return False, "Email and password required"
+    user = auth.login(email, pwd)
+    if not user:
+        return False, "Invalid credentials"
+    st.session_state.user = user
+    st.session_state.page = "Home"
+    return True, "Welcome back!"
+
+
+def auth_page():
+    mode = st.session_state.get("auth_mode", "login")
+
+    # Create 3 columns to center the content
+    col1, col2, col3 = st.columns([1, 2, 1])
+
+    with col2:
+        # Spacer to push content down slightly
+        st.markdown("<div style='height: 50px;'></div>", unsafe_allow_html=True)
+
+        # Header Section
+        if mode == "login":
+            st.markdown('<div class="auth-header">Welcome Back</div>', unsafe_allow_html=True)
+            st.markdown('<div class="auth-sub">Enter your details to access your study plan</div>',
+                        unsafe_allow_html=True)
+
+            with st.form("login_form"):
+                email = st.text_input("Email", key="login_email", placeholder="student@example.com")
+                pwd = st.text_input("Password", type="password", key="login_pwd", placeholder="••••••••")
+
+                # Checkbox and Forgot Password Link
+                c1, c2 = st.columns([1, 1])
+                with c1:
+                    remember = st.checkbox("Remember me")
+
+                submitted = st.form_submit_button("Sign In")
+
+            if submitted:
+                ok, msg = login_action(email, pwd)
+                if ok:
+                    st.success(msg)
+                    st.rerun()
+                else:
+                    st.error(msg)
+
+            # Switcher
+            st.markdown('<div class="auth-toggle-text">New here?</div>', unsafe_allow_html=True)
+            if st.button("Create an Account", type="secondary", use_container_width=True):
+                st.session_state.auth_mode = "signup"
+                st.rerun()
+
+        else:  # Signup Mode
+            st.markdown('<div class="auth-header">Create Account</div>', unsafe_allow_html=True)
+            st.markdown('<div class="auth-sub">Start tracking your productivity today</div>', unsafe_allow_html=True)
+
+            with st.form("signup_form"):
+                email = st.text_input("Email", key="signup_email", placeholder="name@example.com")
+                pwd = st.text_input("Password", type="password", key="signup_pwd", placeholder="Min 8 chars")
+                pwd2 = st.text_input("Confirm Password", type="password", key="signup_pwd2",
+                                     placeholder="Repeat password")
+
+                agree = st.checkbox("I agree to the Terms & Privacy")
+                submitted = st.form_submit_button("Create Account")
+
+            if submitted:
+                if not agree:
+                    st.error("Please agree to the terms")
+                else:
+                    ok, msg = register_action(email, pwd, pwd2)
+                    if ok:
+                        st.success(msg)
+                        st.rerun()
+                    else:
+                        st.error(msg)
+
+            # Switcher
+            st.markdown('<div class="auth-toggle-text">Already have an account?</div>', unsafe_allow_html=True)
+            if st.button("Log In Instead", type="secondary", use_container_width=True):
+                st.session_state.auth_mode = "login"
+                st.rerun()
+
+
+def render_sidebar(user):
+    with st.sidebar:
+        # --- Logo & User Info ---
+        st.markdown(f"""
+            <div style="margin-bottom: 30px; text-align: center;">
+                <div style="font-size: 40px; margin-bottom: 10px;">📚</div>
+                <h3 style="margin:0; color:#0f172a;">StudyTracker</h3>
+                <div style="color: #64748b; font-size: 0.8rem; margin-top: 5px; 
+                     background: #f1f5f9; padding: 4px 12px; border-radius: 20px; display: inline-block;">
+                    {user.get("email")}
+                </div>
             </div>
-            """,
-            unsafe_allow_html=True,
-        )
+        """, unsafe_allow_html=True)
 
-def login_view():
-    st.markdown("<div class='section-card'>", unsafe_allow_html=True)
-    st.subheader("Login")
+        # --- Navigation ---
+        # We use a standard dictionary for menu items
+        menu = {
+            "Home": "🏠",
+            "Add Plan": "➕",
+            "Log Hours": "⏱️",
+            "Analytics": "📊",
+            "Chatbot": "🤖"
+        }
 
-    with st.form("login_form"):
-        email = st.text_input("Email")
-        password = st.text_input("Password", type="password")
-        submit = st.form_submit_button("Login")
+        st.markdown('<p style="font-size: 12px; color: #94a3b8; font-weight: 600; margin-top: 20px;">MENU</p>',
+                    unsafe_allow_html=True)
 
-    if submit:
-        user = auth.login(email, password)
-        if user:
-            st.session_state.user = user
-            st.success("Login successful.")
+        current_page = st.session_state.get("page", "Home")
+
+        for page_name, icon in menu.items():
+            # If the button is clicked, update state and rerun
+            # We highlight the button if it's the current page (simulated via formatting)
+            label = f"{icon}  {page_name}"
+            if page_name == current_page:
+                label = f"🔵  {page_name}"  # active indicator
+
+            if st.button(label, key=f"nav_{page_name}", use_container_width=True):
+                st.session_state.page = page_name
+                st.rerun()
+
+        # --- Logout Section ---
+        st.markdown("---")
+        if st.button("🚪 Logout", use_container_width=True):
+            st.session_state.clear()
             st.rerun()
-        else:
-            st.error("Invalid email or password.")
-    st.markdown("</div>", unsafe_allow_html=True)
 
-def register_view():
-    st.markdown("<div class='section-card'>", unsafe_allow_html=True)
-    st.subheader("Create Account")
 
-    with st.form("reg_form"):
-        email = st.text_input("Email")
-        pass1 = st.text_input("Password", type="password")
-        pass2 = st.text_input("Confirm Password", type="password")
-        submit = st.form_submit_button("Register")
+def home_page():
+    user = st.session_state.get("user")
 
-    if submit:
-        if pass1 != pass2:
-            st.error("Passwords do not match.")
-        else:
-            ok = auth.register(email, pass1)
-            if ok:
-                st.success("Account created. Please login.")
-            else:
-                st.error("Email already registered.")
-    st.markdown("</div>", unsafe_allow_html=True)
+    # 1. Header Section
+    st.markdown(f"""
+        <h1 style='font-size: 2.5rem; margin-bottom: 0;'>Hello, {user.get("email").split('@')[0].title()} 👋</h1>
+        <p style='color: #64748b; margin-bottom: 40px;'>Here is your daily activity overview.</p>
+    """, unsafe_allow_html=True)
 
-def sidebar_menu():
-    st.sidebar.markdown("<div class='menu-card'>", unsafe_allow_html=True)
-    if "user" in st.session_state:
-        st.sidebar.write(f"Logged in as: **{st.session_state.user['email']}**")
-        page = st.sidebar.radio("Navigation", ["Add Plan", "Log Hours", "Analytics", "Chatbot", "Logout"])
+    # 2. Stats Grid using Native Columns
+    col1, col2, col3 = st.columns(3)
+
+    # Calculate stats (mock data or real)
+    logs = storage.read_csv("study_logs.csv")
+    uid = user.get("user_id")
+
+    total_hours = 0.0
+    if logs is not None and not logs.empty:
+        user_logs = logs[logs["user_id"] == uid]
+        total_hours = user_logs["hours_studied"].sum() if not user_logs.empty else 0.0
+
+    with col1:
+        st.metric("Total Hours", f"{total_hours:.1f} h", delta="This Month")
+    with col2:
+        st.metric("Study Streak", "3 Days", delta="🔥 On Fire")
+    with col3:
+        st.metric("Pending Plans", "2", delta="-1 from yesterday", delta_color="inverse")
+
+    # 3. Recent Activity Section
+    st.markdown("### 📅 Recent Study Plans", unsafe_allow_html=True)
+
+    plans = storage.read_csv("study_plans.csv")
+    if plans is not None and not plans.empty:
+        user_plans = plans[plans["user_id"] == uid].tail(3)  # Get last 3
+
+        # Create a clean DataFrame view or custom cards
+        for index, row in user_plans.iterrows():
+            with st.container():
+                # Styled Card for each plan
+                st.markdown(f"""
+                <div style="background: white; padding: 16px; border-radius: 12px; border: 1px solid #e2e8f0; margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center;">
+                    <div>
+                        <div style="font-weight: 600; color: #0f172a; font-size: 1.1rem;">{row['subject']}</div>
+                        <div style="color: #64748b; font-size: 0.9rem;">{row['goal']}</div>
+                    </div>
+                    <div style="text-align: right;">
+                        <div style="background: #e0e7ff; color: #4338ca; padding: 4px 12px; border-radius: 20px; font-size: 0.8rem; font-weight: 600;">
+                            {row['planned_hours']}h Planned
+                        </div>
+                    </div>
+                </div>
+                """, unsafe_allow_html=True)
     else:
-        page = st.sidebar.radio("Navigation", ["Home", "Login", "Register"])
-    st.sidebar.markdown("</div>", unsafe_allow_html=True)
-    return page
+        st.info("No plans yet. Click 'Add Plan' to get started!")
 
-def logout():
-    if "user" in st.session_state:
-        del st.session_state["user"]
-    st.rerun()
-
-def load_page(name):
-    try:
-        module_name = {
-            "Add Plan": "pages.1_Add_Plan",
-            "Log Hours": "pages.2_Log_Hours",
-            "Analytics": "pages.3_Analytics",
-            "Chatbot": "pages.4_Chatbot"
-        }.get(name)
-        if module_name:
-            mod = importlib.import_module(module_name)
-            mod.app(storage)
-    except Exception as e:
-        st.error("Error loading page.")
-        st.exception(e)
-
-def home_view():
-    st.markdown("<div class='section-card'><h2>Welcome to StudyPlanTracker</h2>Track your learning journey effectively.</div>", unsafe_allow_html=True)
 
 def main():
-    render_header()
-    page = sidebar_menu()
+    if "page" not in st.session_state:
+        st.session_state.page = "Home"
+    if "auth_mode" not in st.session_state:
+        st.session_state.auth_mode = "login"
 
-    if page == "Home":
-        home_view()
-    elif page == "Login":
-        login_view()
-    elif page == "Register":
-        register_view()
-    elif page == "Logout":
-        logout()
-    else:
-        if "user" not in st.session_state:
-            st.warning("Please login first.")
-            login_view()
-            return
-        load_page(page)
+    user = st.session_state.get("user", None)
+
+    if not user:
+        auth_page()
+        return
+
+    render_sidebar(user)
+
+    if st.session_state.page == "Home":
+        home_page()
+    elif st.session_state.page == "Add Plan":
+        st.markdown('<div class="main-content">', unsafe_allow_html=True)
+        mod = importlib.import_module("pages.1_Add_Plan")
+        mod.app(storage)
+        st.markdown('</div>', unsafe_allow_html=True)
+    elif st.session_state.page == "Log Hours":
+        st.markdown('<div class="main-content">', unsafe_allow_html=True)
+        mod = importlib.import_module("pages.2_Log_Hours")
+        mod.app(storage)
+        st.markdown('</div>', unsafe_allow_html=True)
+    elif st.session_state.page == "Analytics":
+        st.markdown('<div class="main-content">', unsafe_allow_html=True)
+        mod = importlib.import_module("pages.3_Analytics")
+        mod.app(storage)
+        st.markdown('</div>', unsafe_allow_html=True)
+    elif st.session_state.page == "Chatbot":
+        st.markdown('<div class="main-content">', unsafe_allow_html=True)
+        mod = importlib.import_module("pages.4_Chatbot")
+        mod.app(storage)
+        st.markdown('</div>', unsafe_allow_html=True)
+
 
 if __name__ == "__main__":
     main()

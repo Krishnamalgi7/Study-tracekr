@@ -2,84 +2,67 @@ import streamlit as st
 import pandas as pd
 
 def app(storage):
-    st.markdown("<div class='section-card'>", unsafe_allow_html=True)
-    st.subheader("Add Study Plan")
-    st.write("Create structured study plans to stay organized.")
-
-    user = st.session_state.user
-    uid = user["user_id"]
-
+    st.markdown("<div class='card'><h3>New Study Plan</h3>", unsafe_allow_html=True)
+    user = st.session_state.get("user")
+    if not user:
+        st.warning("Please login to add plans")
+        st.markdown("</div>", unsafe_allow_html=True)
+        return
+    uid = user.get("user_id")
     df = storage.read_csv("study_plans.csv")
     if df is None or df.empty:
-        df = pd.DataFrame(columns=["user_id", "subject", "goal", "planned_hours", "date"])
-
-    with st.form("plan_form"):
+        df = pd.DataFrame(columns=["user_id","subject","goal","planned_hours","date"])
+    with st.form("plan"):
         subject = st.text_input("Subject")
-        goal = st.text_area("Goal Description")
-        planned_hours = st.number_input("Planned Hours", min_value=0.0, step=1.0)
-        date = st.date_input("Select Date")
-        submitted = st.form_submit_button("Add Plan")
-
-    if submitted:
-        new_row = {
-            "user_id": uid,
-            "subject": subject.strip(),
-            "goal": goal.strip(),
-            "planned_hours": planned_hours,
-            "date": str(date)
-        }
-        storage.append_row("study_plans.csv", new_row)
-        st.success("Study plan added successfully!")
+        goal = st.text_area("Goal description")
+        hours = st.number_input("Planned hours", min_value=0.0, step=0.5)
+        date = st.date_input("Date")
+        submit = st.form_submit_button("Save Plan")
+    if submit:
+        row = {"user_id":uid,"subject":subject.strip(),"goal":goal.strip(),"planned_hours":hours,"date":str(date)}
+        storage.append_row("study_plans.csv", row)
+        st.success("Plan added")
         st.rerun()
-
-    user_plans = df[df["user_id"] == uid]
-
-    st.markdown("<hr>", unsafe_allow_html=True)
-    st.subheader("Your Study Plans")
-
-    if user_plans.empty:
-        st.info("No study plans added yet.")
+    st.markdown("</div>", unsafe_allow_html=True)
+    st.markdown("<div style='height:12px'></div>", unsafe_allow_html=True)
+    st.markdown("<div class='card'><h4>Your Plans</h4>", unsafe_allow_html=True)
+    plans = storage.read_csv("study_plans.csv")
+    if plans is None or plans.empty:
+        st.info("No plans yet")
     else:
-        for i, row in user_plans.iterrows():
-            st.markdown("<div class='section-card'>", unsafe_allow_html=True)
-            st.write(f"### {row['subject']}")
-            st.write(f"**Goal:** {row['goal']}")
-            st.write(f"**Planned Hours:** {row['planned_hours']}")
-            st.write(f"**Date:** {row['date']}")
-
-            col1, col2 = st.columns(2)
-            with col1:
-                if st.button(f"Edit {i}"):
-                    st.session_state["edit_index"] = i
-            with col2:
-                if st.button(f"Delete {i}"):
-                    storage.delete_row("study_plans.csv", i)
-                    st.success("Deleted.")
-                    st.rerun()
-            st.markdown("</div>", unsafe_allow_html=True)
-
-    if "edit_index" in st.session_state:
-        idx = st.session_state["edit_index"]
-        if idx in user_plans.index:
-            edit_row = user_plans.loc[idx]
-            st.markdown("<div class='section-card'>", unsafe_allow_html=True)
-            st.subheader("Edit Plan")
-
-            with st.form("edit_form"):
-                new_subject = st.text_input("Subject", edit_row["subject"])
-                new_goal = st.text_area("Goal", edit_row["goal"])
-                new_hours = st.number_input("Hours", value=float(edit_row["planned_hours"]))
-                new_date = st.date_input("Date", pd.to_datetime(edit_row["date"]))
-                save = st.form_submit_button("Save Changes")
-
-            if save:
-                df.loc[idx, "subject"] = new_subject
-                df.loc[idx, "goal"] = new_goal
-                df.loc[idx, "planned_hours"] = new_hours
-                df.loc[idx, "date"] = str(new_date)
-                storage.update_csv("study_plans.csv", df)
-                del st.session_state["edit_index"]
-                st.success("Updated!")
+        ups = plans[plans["user_id"]==uid] if "user_id" in plans.columns else pd.DataFrame()
+        for i, r in ups.iterrows():
+            st.markdown(f"<div style='padding:12px;border-radius:8px;margin:8px 0;background:linear-gradient(90deg,rgba(255,250,240,0.6),#fff);'><b>{r.get('subject')}</b><div class='small'>{r.get('goal')}</div><div class='small'>Planned {r.get('planned_hours')} hrs • {r.get('date')}</div></div>", unsafe_allow_html=True)
+            cols = st.columns([1,1])
+            if cols[0].button("Edit", key=f"edit_plan_{i}"):
+                st.session_state.edit_plan = i
                 st.rerun()
-
+            if cols[1].button("Delete", key=f"del_plan_{i}"):
+                storage.delete_row("study_plans.csv", i)
+                st.success("Deleted")
+                st.rerun()
+    st.markdown("</div>", unsafe_allow_html=True)
+    if "edit_plan" in st.session_state:
+        idx = st.session_state.edit_plan
+        plans = storage.read_csv("study_plans.csv")
+        if plans is None or plans.empty:
+            return
+        if idx in plans.index:
+            r = plans.loc[idx]
+            st.markdown("<div class='card'><h4>Edit Plan</h4>", unsafe_allow_html=True)
+            with st.form("edit"):
+                s = st.text_input("Subject", value=r.get("subject",""))
+                g = st.text_area("Goal", value=r.get("goal",""))
+                h = st.number_input("Hours", value=float(r.get("planned_hours",0.0)))
+                d = st.date_input("Date", value=pd.to_datetime(r.get("date")) if r.get("date") else None)
+                save = st.form_submit_button("Save")
+            if save:
+                plans.loc[idx,"subject"]=s
+                plans.loc[idx,"goal"]=g
+                plans.loc[idx,"planned_hours"]=h
+                plans.loc[idx,"date"]=str(d)
+                storage.update_csv("study_plans.csv", plans)
+                del st.session_state["edit_plan"]
+                st.success("Updated")
+                st.rerun()
             st.markdown("</div>", unsafe_allow_html=True)
