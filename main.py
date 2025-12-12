@@ -15,117 +15,150 @@ st.set_page_config(page_title="StudyPlanTracker", page_icon="📚", layout="wide
 css = """
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+*{font-family:'Inter',sans-serif}
 
-* { font-family: 'Inter', sans-serif; }
+/* Hide default Streamlit chrome */
+[data-testid="stSidebarNav"]{display:none!important}
+[data-testid="stHeader"]{display:none!important}
+footer{display:none!important}
+[data-testid="collapsedControl"]{display:none!important}
 
-/* 1. HIDE DEFAULT ELEMENTS */
-[data-testid="stSidebarNav"] { display: none !important; }
-[data-testid="stHeader"] { display: none !important; }
-footer { display: none !important; }
-[data-testid="collapsedControl"] { display: none !important; }
+/* Sidebar container: make scrollable with proper padding */
+section[data-testid="stSidebar"]{
+  position:fixed!important;
+  top:0; left:0;
+  height:100vh;
+  width:300px!important; min-width:300px!important;
+  transform:translateX(-260px);
+  transition:transform .32s ease;
+  background:rgba(255,255,255,0.96);
+  backdrop-filter:blur(10px);
+  border-right:1px solid #e2e8f0;
+  box-shadow:4px 0 18px rgba(0,0,0,0.06);
+  overflow-y:auto !important;
+  -webkit-overflow-scrolling: touch !important;
+  z-index:20000!important;
+  padding-bottom: 100px !important; /* Increased to prevent overlap */
+}
+section[data-testid="stSidebar"]:hover{ transform:translateX(0); box-shadow:10px 0 30px rgba(0,0,0,0.12); }
+section[data-testid="stSidebar"]::after{ content:""; position:absolute; right:0; top:0; height:90%; width:4px; background:linear-gradient(to bottom,transparent,#6366f1,transparent); opacity:.45; }
 
-/* 2. THE FLOATING SIDEBAR MAGIC */
-section[data-testid="stSidebar"] {
-    position: fixed !important; 
-    top: 0;
-    left: 0;
-    height: 100vh;
-    z-index: 100000;
-    width: 300px !important;
-    min-width: 300px !important;
-    transform: translateX(-285px); 
-    transition: transform 0.4s cubic-bezier(0.25, 1, 0.5, 1); 
-    background-color: rgba(255, 255, 255, 0.95);
-    backdrop-filter: blur(10px);
-    border-right: 1px solid #e2e8f0;
-    box-shadow: 4px 0 15px rgba(0,0,0,0.05);
+/* Header area */
+div[data-testid="stSidebarUserContent"]{ padding-top:8px!important; padding-bottom:6px!important; padding-left:1rem!important; padding-right:1rem!important; }
+section[data-testid="stSidebar"] h3{ margin:0 0 6px 0!important; font-size:1.05rem!important; }
+
+/* Stack layout: reduced gap for compactness */
+div[data-testid="stVerticalBlock"], section[data-testid="stSidebar"] > div{
+  display:flex!important; flex-direction:column!important; gap:6px!important; align-items:stretch!important;
 }
 
-section[data-testid="stSidebar"]:hover {
-    transform: translateX(0);
-    box-shadow: 10px 0 30px rgba(0,0,0,0.1);
+/* Menu buttons (pill style) - CONSISTENT ACROSS ALL PAGES */
+section[data-testid="stSidebar"] .stButton > button,
+section[data-testid="stSidebar"] div[data-testid="stVerticalBlock"] .stButton > button,
+section[data-testid="stSidebar"] button[kind="secondary"]{
+  display:flex!important; align-items:center!important; gap:10px!important;
+  width:calc(100% - 36px)!important;
+  margin:6px 18px!important;
+  padding:10px 14px!important;
+  background:linear-gradient(180deg,#eef2ff,#f3f4ff)!important;
+  color:#4338ca!important;
+  border-radius:12px!important;
+  border:1px solid rgba(67,56,202,0.12)!important;
+  box-shadow:0 6px 10px rgba(99,102,241,0.06)!important;
+  font-weight:600!important; text-align:left!important;
+  transition: padding-left .12s ease, transform .12s ease!important;
+}
+section[data-testid="stSidebar"] .stButton > button::before,
+section[data-testid="stSidebar"] div[data-testid="stVerticalBlock"] .stButton > button::before{ 
+  content:""!important; width:6px!important; height:26px!important; 
+  border-radius:0 6px 6px 0!important; 
+  background:linear-gradient(180deg,#5b4ef7,#7a5cff)!important; 
+  margin-right:8px!important; 
+}
+section[data-testid="stSidebar"] .stButton > button:hover,
+section[data-testid="stSidebar"] button[kind="secondary"]:hover{ 
+  transform:translateX(5px)!important; 
+  padding-left:18px!important;
+  background:linear-gradient(180deg,#eef2ff,#f3f4ff)!important;
+}
+section[data-testid="stSidebar"] .stButton > button[aria-pressed="true"]{ 
+  background:linear-gradient(180deg,#e1e7ff,#e7ebff)!important; 
+  border-left:4px solid #4338ca!important; 
+  padding-left:16px!important; 
 }
 
-section[data-testid="stSidebar"]::after {
-    content: "";
-    position: absolute;
-    right: 0;
-    top: 0;
-    height: 100%;
-    width: 4px;
-    background: linear-gradient(to bottom, transparent, #6366f1, transparent);
-    opacity: 0.5;
+/* Spacer to push logout button down and prevent overlap */
+.menu-bottom-spacer{
+  height:30px !important;  /* Increased height for better spacing */
+  width:100%;
+  flex-shrink:0;
 }
 
-[data-testid="stAppViewContainer"] {
-    margin-left: 0 !important;
-    width: 100% !important;
-    background-color: #f8fafc;
-    background-image: radial-gradient(at 0% 0%, #e0e7ff 0%, transparent 50%), 
-                      radial-gradient(at 100% 100%, #f3e8ff 0%, transparent 50%);
+/* Logout container - fixed positioning */
+/* Logout pinned and visible above footer */
+section[data-testid="stSidebar"] .logout-container{
+  position: fixed !important;
+  bottom: 80px !important;
+  left: 12px !important;
+  width: 276px !important;
+  margin: 0 !important; 
+  padding: 8px 0 !important;
+  z-index: 25000 !important; 
+  display: block !important;
+  background: rgba(255,255,255,0.98) !important;
+  backdrop-filter: blur(8px) !important;
 }
 
-/* --- 3. SPACING & ALIGNMENT CONTROLS --- */
-
-div[data-testid="stSidebarUserContent"] {
-    padding-top: 20px !important;
-    padding-bottom: 10px !important; 
-    padding-left: 1rem !important;
-    padding-right: 1rem !important;
+/* Logout button styling */
+section[data-testid="stSidebar"] .logout-container a,
+section[data-testid="stSidebar"] .logout-container button{
+  display:block!important; width:100%!important;
+  padding:12px 16px!important; border-radius:12px!important;
+  background:linear-gradient(180deg,#fff1f2,#ffe4e6)!important;
+  color:#be123c!important; border:1px solid #fecdd3!important;
+  font-weight:600!important; text-align:left!important; text-decoration:none!important;
+  box-shadow:0 8px 14px rgba(249,115,22,0.05)!important;
+  transition: all 0.2s ease !important;
+}
+section[data-testid="stSidebar"] .logout-container a:hover,
+section[data-testid="stSidebar"] .logout-container button:hover{
+  padding-left:22px!important; 
+  background:#ffe4e6!important;
+  box-shadow:0 10px 20px rgba(249,115,22,0.1)!important;
 }
 
-/* LOGOUT BUTTON CONTAINER */
+/* Small-screen fallback */
+@media (max-width:900px){
+  section[data-testid="stSidebar"]{ 
+    transform:translateX(0)!important; 
+    padding-bottom:120px!important; 
+  }
+  section[data-testid="stSidebar"] .logout-container{ 
+    position:relative!important; 
+    bottom:auto!important; 
+    margin-top:20px!important;
+    width: auto !important;
+    left: auto !important;
+  }
+}
+
+/* Keep logout button red on all pages */
+section[data-testid="stSidebar"] .logout-container button[kind="secondary"]{
+  background:linear-gradient(180deg,#fff1f2,#ffe4e6)!important;
+  color:#be123c!important;
+  border:1px solid #fecdd3!important;
+}
+
+/* FORCE logout position - Override everything */
+div.logout-container,
+section[data-testid="stSidebar"] div.logout-container,
 .logout-container {
-    margin-top: 50px; /* Standard spacing */
-    width: 100%;      /* Full width */
-    border-top: 1px solid #e2e8f0;  /* This creates the line */
-    padding-top: 15px;              /* Space BELOW the line */
+  position: fixed !important;
+  bottom: 100px !important;
+  left: 12px !important;
+  width: 276px !important;
+  z-index: 99999 !important;
 }
-
-/* LOGOUT BUTTON STYLING (MATCHING OTHER BUTTONS) */
-.logout-container button {
-    width: 100% !important;        /* Full Width */
-    text-align: left !important;   /* Align Text Left */
-    padding-left: 0.5rem !important;
-    height: auto !important;
-
-    /* Subtle Red Styling */
-    background-color: #fff1f2 !important; 
-    color: #e11d48 !important; 
-    border: 1px solid #fecdd3 !important;
-    border-radius: 8px !important;
-    font-weight: 500 !important;
-}
-
-.logout-container button:hover {
-    background-color: #ffe4e6 !important;
-    border-color: #fda4af !important;
-    color: #be123c !important;
-    padding-left: 1rem !important; /* Slide effect on hover */
-}
-
-/* STANDARD MENU BUTTONS */
-.stButton button {
-    background-color: transparent !important;
-    color: #64748b !important;
-    border: none !important;
-    text-align: left !important;
-    padding-left: 0 !important;
-    font-weight: 500 !important;
-    transition: all 0.2s;
-}
-.stButton button:hover {
-    color: #6366f1 !important;
-    background-color: #f1f5f9 !important;
-    padding-left: 10px !important;
-}
-
-/* OTHER STYLES */
-.hero-title { font-size: 3.5rem; font-weight: 800; color: #1e293b; line-height: 1.1; margin-bottom: 0.5rem; }
-.hero-gradient { background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
-.hero-sub { font-size: 1.2rem; color: #64748b; margin-bottom: 2rem; line-height: 1.6; }
-[data-testid="stForm"] { background-color: white; padding: 2.5rem; border-radius: 20px; box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1); border: 1px solid #e2e8f0; }
-div[data-testid="stAlert"] { border-radius: 12px; border: none; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05); background-color: white; }
 </style>
 """
 
@@ -137,10 +170,13 @@ auth = Auth(storage)
 
 
 def register_action(email, pwd, pwd2):
-    if not email or not pwd: return False, "Email and password required"
-    if pwd != pwd2: return False, "Passwords do not match"
+    if not email or not pwd:
+        return False, "Email and password required"
+    if pwd != pwd2:
+        return False, "Passwords do not match"
     ok = auth.register(email, pwd)
-    if not ok: return False, "Account already exists"
+    if not ok:
+        return False, "Account already exists"
     user = auth.login(email, pwd)
     if user:
         st.session_state.user = user
@@ -150,9 +186,11 @@ def register_action(email, pwd, pwd2):
 
 
 def login_action(email, pwd):
-    if not email or not pwd: return False, "Email and password required"
+    if not email or not pwd:
+        return False, "Email and password required"
     user = auth.login(email, pwd)
-    if not user: return False, "Invalid credentials"
+    if not user:
+        return False, "Invalid credentials"
     st.session_state.user = user
     st.session_state.page = "Home"
     return True, "Welcome back!"
@@ -262,17 +300,23 @@ def auth_page():
 
 def render_sidebar(user):
     with st.sidebar:
+        # --- USER HEADER (compact) ---
         st.markdown(f"""
-            <div style="margin-bottom: 20px; text-align: center;">
-                <div style="font-size: 40px; margin-bottom: 10px;">📚</div>
+            <div style="text-align:center; margin-bottom:6px;">
+                <div style="font-size:32px; margin-bottom:6px;">📚</div>
                 <h3 style="margin:0; color:#0f172a;">StudyTracker</h3>
-                <div style="color: #64748b; font-size: 0.8rem; margin-top: 5px; 
-                     background: #f1f5f9; padding: 4px 12px; border-radius: 20px; display: inline-block;">
+                <div style="color:#64748b; font-size:0.78rem; margin-top:6px;
+                            background:#f1f5f9; padding:4px 10px; border-radius:20px; display:inline-block;">
                     {user.get("email")}
                 </div>
             </div>
+            <div style="height:8px; border-top:1px solid #e6e8f0; margin-bottom:8px;"></div>
         """, unsafe_allow_html=True)
 
+        # --- MENU TITLE ---
+        st.markdown('<p style="font-size:12px;color:#94a3b8;font-weight:600;margin:6px 0 6px 0;">MENU</p>', unsafe_allow_html=True)
+
+        # --- NAV MENU ---
         menu = {
             "Home": "🏠",
             "Chatbot": "🤖",
@@ -281,8 +325,6 @@ def render_sidebar(user):
             "Analytics": "📊"
         }
 
-        st.markdown('<p style="font-size: 12px; color: #94a3b8; font-weight: 600; margin-top: 20px;">MENU</p>',
-                    unsafe_allow_html=True)
         current_page = st.session_state.get("page", "Home")
 
         for page_name, icon in menu.items():
@@ -291,9 +333,9 @@ def render_sidebar(user):
                 st.markdown(f"""
                 <style>
                 div[data-testid="stVerticalBlock"] button[kind="secondary"]:nth-of-type({list(menu.keys()).index(page_name) + 1}) {{
-                    background-color: #e0e7ff !important;
-                    color: #4338ca !important;
-                    border-left: 3px solid #4338ca !important;
+                    background-color:#e0e7ff !important;
+                    color:#4338ca !important;
+                    border-left:3px solid #4338ca !important;
                 }}
                 </style>
                 """, unsafe_allow_html=True)
@@ -303,10 +345,31 @@ def render_sidebar(user):
                 st.session_state.page = page_name
                 st.rerun()
 
-        st.markdown('<div class="logout-container">', unsafe_allow_html=True)
-        if st.button("🚪 Logout", key="logout_btn", use_container_width=True):
+        # spacer to ensure logout doesn't overlap menu
+        st.markdown("<div class='menu-bottom-spacer'></div>", unsafe_allow_html=True)
+
+        # --- LOGOUT at bottom (anchor link triggers query param logout handler) ---
+        # --- LOGOUT at bottom with inline positioning ---
+        st.markdown("""
+            <style>
+            .custom-logout-wrapper {
+                position: fixed !important;
+                bottom: 80px !important;
+                left: 12px !important;
+                width: 276px !important;
+                z-index: 25000 !important;
+                background: rgba(255,255,255,0.98) !important;
+                backdrop-filter: blur(8px) !important;
+                padding: 8px 0 !important;
+            }
+            </style>
+            <div class="custom-logout-wrapper">
+        """, unsafe_allow_html=True)
+
+        if st.button("🚪  Logout", key="logout_btn", use_container_width=True):
             st.session_state.clear()
             st.rerun()
+
         st.markdown('</div>', unsafe_allow_html=True)
 
 
@@ -357,81 +420,266 @@ def delete_plan_callback(index):
 
 def home_page():
     user = st.session_state.get("user")
-    uid = str(user.get("user_id")).replace('.0', '')  # Ensure string format matches logic
+    uid = str(user.get("user_id")).replace('.0', '')
 
-    # --- HEADER ---
-    st.markdown(f"""
-        <h1 style='font-size: 2.5rem; margin-bottom: 0;'>Hello, {user.get("email").split('@')[0].title()} 👋</h1>
-        <p style='color: #64748b; margin-bottom: 30px;'>Here is your daily activity overview.</p>
+    # Modern glassmorphism and particle animations
+    st.markdown("""
+    <style>
+    /* Animated particles background */
+    @keyframes particle-float {
+        0%, 100% { 
+            transform: translate(0, 0) rotate(0deg);
+            opacity: 0.3;
+        }
+        33% { 
+            transform: translate(30px, -30px) rotate(120deg);
+            opacity: 0.6;
+        }
+        66% { 
+            transform: translate(-20px, 20px) rotate(240deg);
+            opacity: 0.4;
+        }
+    }
+
+    /* Fade in up animation */
+    @keyframes fadeInUp {
+        from {
+            opacity: 0;
+            transform: translateY(30px);
+        }
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+
+    /* Scale pop animation */
+    @keyframes scalePop {
+        0% {
+            transform: scale(0.8);
+            opacity: 0;
+        }
+        50% {
+            transform: scale(1.05);
+        }
+        100% {
+            transform: scale(1);
+            opacity: 1;
+        }
+    }
+
+    /* Floating particles */
+    .particle {
+        position: fixed;
+        width: 10px;
+        height: 10px;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        border-radius: 50%;
+        pointer-events: none;
+        z-index: 0;
+        animation: particle-float 8s ease-in-out infinite;
+    }
+
+    .particle:nth-child(1) { top: 10%; left: 10%; animation-delay: 0s; }
+    .particle:nth-child(2) { top: 20%; left: 80%; animation-delay: 1s; }
+    .particle:nth-child(3) { top: 60%; left: 15%; animation-delay: 2s; }
+    .particle:nth-child(4) { top: 80%; left: 70%; animation-delay: 3s; }
+    .particle:nth-child(5) { top: 40%; left: 90%; animation-delay: 1.5s; }
+
+    /* Glassmorphism cards - UPDATED BACKGROUND FOR WHITE TEXT */
+    [data-testid="stVerticalBlock"] > div[data-testid="element-container"] > div[data-testid="stVerticalBlock"] {
+        backdrop-filter: blur(20px) !important;
+        /* Changed to dark gradient so white text is visible */
+        background: linear-gradient(135deg, rgba(102, 126, 234, 0.9), rgba(118, 75, 162, 0.9)) !important;
+        border: 1px solid rgba(255, 255, 255, 0.3) !important;
+        box-shadow: 0 8px 32px rgba(99, 102, 241, 0.15) !important;
+        transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1) !important;
+        position: relative !important;
+        overflow: hidden !important;
+        border-radius: 16px !important;
+    }
+
+    [data-testid="stVerticalBlock"] > div[data-testid="element-container"] > div[data-testid="stVerticalBlock"]:hover {
+        transform: translateY(-8px) scale(1.02) !important;
+        box-shadow: 0 20px 60px rgba(99, 102, 241, 0.3) !important;
+    }
+
+    /* Header animations */
+    .modern-header {
+        animation: fadeInUp 0.8s ease-out;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
+        font-weight: 800 !important;
+        letter-spacing: -1px;
+    }
+
+    .subtitle {
+        animation: fadeInUp 1s ease-out 0.2s backwards;
+        font-size: 1.1rem;
+        color: #64748b;
+    }
+
+    /* Quick actions animations */
+    .action-card-1 { animation: scalePop 0.5s ease-out 0.3s backwards; }
+    .action-card-2 { animation: scalePop 0.5s ease-out 0.5s backwards; }
+    .action-card-3 { animation: scalePop 0.5s ease-out 0.7s backwards; }
+
+    /* Modern buttons - UPDATED TO WHITE/TRANSPARENT STYLE */
+    .stButton > button {
+        background: rgba(255, 255, 255, 0.2) !important;
+        color: white !important;
+        border: 1px solid rgba(255,255,255,0.5) !important;
+        font-weight: 600 !important;
+        padding: 12px 24px !important;
+        border-radius: 12px !important;
+        transition: all 0.3s ease !important;
+    }
+
+    .stButton > button:hover {
+        background: white !important;
+        color: #667eea !important;
+        transform: translateY(-2px) scale(1.05) !important;
+    }
+
+    /* Section title - UPDATED TO BLACK */
+    .section-title {
+        font-size: 1.8rem;
+        font-weight: 700;
+        color: #000000 !important; /* Changed from Gradient to Black */
+        margin-bottom: 20px;
+        animation: fadeInUp 0.6s ease-out;
+    }
+
+    /* Plan cards */
+    .plan-card {
+        background: white !important; /* Keep plan cards white */
+        border: 2px solid #e2e8f0 !important;
+        border-radius: 16px !important;
+        padding: 20px !important;
+        transition: all 0.4s ease !important;
+        animation: fadeInUp 0.5s ease-out;
+        color: black !important;
+    }
+
+    .plan-card:hover {
+        transform: translateX(10px) scale(1.02) !important;
+        box-shadow: 0 15px 40px rgba(102, 126, 234, 0.15) !important;
+        border-color: #667eea !important;
+    }
+
+    /* Badge style */
+    .hours-badge {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%) !important;
+        color: white !important;
+        padding: 6px 14px;
+        border-radius: 20px;
+        font-size: 0.9rem;
+        font-weight: 700;
+        display: inline-block;
+        box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
+    }
+
+    /* Icon animations */
+    .icon-bounce {
+        display: inline-block;
+        animation: iconBounce 2s ease-in-out infinite;
+    }
+
+    @keyframes iconBounce {
+        0%, 100% { transform: translateY(0) rotate(0deg); }
+        25% { transform: translateY(-5px) rotate(-10deg); }
+        75% { transform: translateY(-3px) rotate(10deg); }
+    }
+
+    /* Smooth divider */
+    .fancy-divider {
+        height: 2px;
+        background: linear-gradient(90deg, transparent, #667eea, transparent);
+        margin: 30px 0;
+        animation: fadeInUp 0.8s ease-out;
+    }
+    </style>
+
+    <div class="particle"></div>
+    <div class="particle"></div>
+    <div class="particle"></div>
+    <div class="particle"></div>
+    <div class="particle"></div>
     """, unsafe_allow_html=True)
 
-    # --- 1. QUICK ACTIONS ---
-    st.markdown("### 🚀 Quick Actions")
-    act1, act2, act3 = st.columns(3)
+    # --- MODERN HEADER ---
+    st.markdown(f"""
+        <h1 class="modern-header" style='font-size: 2.8rem; margin-bottom: 10px;'>
+            Hello, {user.get("email").split('@')[0].title()} <span class="icon-bounce">👋</span>
+        </h1>
+        <p class="subtitle">Here is your daily activity overview.</p>
+    """, unsafe_allow_html=True)
 
-    with act1:
-        with st.container(border=True):
-            st.markdown("#### ➕ Add Plan")
-            st.write("Schedule a session")
-            if st.button("Go to Planner", use_container_width=True):
-                st.session_state.page = "Add Plan"
-                st.rerun()
+    st.markdown('<br>', unsafe_allow_html=True)
 
-    with act2:
-        with st.container(border=True):
-            st.markdown("#### ⏱️ Log Hours")
-            st.write("Track progress")
-            if st.button("Log Time", use_container_width=True):
-                st.session_state.page = "Log Hours"
-                st.rerun()
+    # --- QUICK ACTIONS ---
+    # UPDATED: Replaced emoji with BLACK text styling class
+    st.markdown('<h3 class="section-title"><span class="icon-bounce">🚀</span> Quick Actions</h3>',
+                unsafe_allow_html=True)
 
-    with act3:
-        with st.container(border=True):
-            st.markdown("#### 🤖 AI Tutor")
-            st.write("Ask doubts")
-            if st.button("Ask AI", use_container_width=True):
-                st.session_state.page = "Chatbot"
-                st.rerun()
+    col1, col2, col3 = st.columns(3)
 
-    st.markdown("---")
+    cols = [col1, col2, col3]
+    actions = [
+        ("➕", "Add Plan", "Schedule a session", "Add Plan", "home_planner"),
+        ("⏱️", "Log Hours", "Track progress", "Log Hours", "home_log"),
+        ("🤖", "AI Tutor", "Ask doubts", "Chatbot", "home_ai")
+    ]
 
-    # --- 2. YOUR PLANS LIST (With Delete Button) ---
-    st.markdown("### 📅 Your Study Plans")
+    for idx, (col, (icon, title, desc, page, key)) in enumerate(zip(cols, actions)):
+        with col:
+            st.markdown(f'<div class="action-card-{idx + 1}">', unsafe_allow_html=True)
+            with st.container(border=True):
+                # UPDATED: Added color: white !important to text
+                st.markdown(f"<h4 style='margin:0; font-size:1.3rem; color: white !important;'>{icon} {title}</h4>", unsafe_allow_html=True)
+                st.markdown(f"<p style='color: white !important; margin:10px 0; opacity: 0.9;'>{desc}</p>", unsafe_allow_html=True)
+                if st.button(f"Go to {title}", use_container_width=True, key=key):
+                    st.session_state.page = page
+                    st.rerun()
+            st.markdown('</div>', unsafe_allow_html=True)
+
+    st.markdown('<div class="fancy-divider"></div>', unsafe_allow_html=True)
+
+    # --- YOUR PLANS ---
+    # UPDATED: Replaced emoji with BLACK text styling class
+    st.markdown('<h3 class="section-title"><span class="icon-bounce">📅</span> Your Study Plans</h3>',
+                unsafe_allow_html=True)
 
     plans = storage.read_csv("study_plans.csv")
 
     if plans is not None and not plans.empty and "user_id" in plans.columns:
-        # Filter for current user
         plans["user_id"] = plans["user_id"].astype(str).str.replace(r'\.0$', '', regex=True)
         user_plans = plans[plans["user_id"] == uid]
 
         if not user_plans.empty:
-            # Sort by newest first
             user_plans = user_plans.sort_index(ascending=False)
 
             for index, row in user_plans.iterrows():
-                # We use a container with a border for the card look
+                st.markdown('<div class="plan-card">', unsafe_allow_html=True)
                 with st.container(border=True):
-                    # Create 3 columns: Info (Wide) | Hours (Narrow) | Delete (Narrow)
                     c_info, c_hours, c_action = st.columns([4, 2, 1])
 
                     with c_info:
-                        st.markdown(f"**{row.get('subject', 'Untitled')}**")
+                        # Black text inside the white plan cards
+                        st.markdown(f"**📚 {row.get('subject', 'Untitled')}**")
                         st.caption(row.get('goal', 'No description'))
 
                     with c_hours:
-                        # Display hours with a nice badge look
                         st.markdown(f"""
-                        <div style="background-color: #e0e7ff; color: #4338ca; padding: 4px 10px; 
-                                    border-radius: 15px; font-size: 0.85rem; text-align: center; font-weight: 600;">
-                            {row.get('planned_hours', 0)}h
+                        <div class="hours-badge">
+                            ⏰ {row.get('planned_hours', 0)}h
                         </div>
                         """, unsafe_allow_html=True)
                         st.caption(f"📅 {row.get('date')}")
 
                     with c_action:
-                        # The Delete Button
-                        # We use on_click so it happens BEFORE the app reloads
                         st.button(
                             "🗑️",
                             key=f"home_del_{index}",
@@ -439,17 +687,22 @@ def home_page():
                             on_click=delete_plan_callback,
                             args=(index,)
                         )
+                st.markdown('</div>', unsafe_allow_html=True)
         else:
-            st.info("You don't have any active plans.")
+            st.info("✨ You don't have any active plans. Click 'Add Plan' to get started!")
     else:
-        st.info("No plans found. Click 'Add Plan' to get started!")
+        st.info("✨ No plans found. Click 'Add Plan' to create your first study plan!")
 
 
 def main():
-    if "page" not in st.session_state: st.session_state.page = "Home"
-    if "auth_mode" not in st.session_state: st.session_state.auth_mode = "login"
+    if "page" not in st.session_state:
+        st.session_state.page = "Home"
+    if "auth_mode" not in st.session_state:
+        st.session_state.auth_mode = "login"
     user = st.session_state.get("user", None)
-    if not user: auth_page(); return
+    if not user:
+        auth_page()
+        return
     render_sidebar(user)
     if st.session_state.page == "Home":
         home_page()
