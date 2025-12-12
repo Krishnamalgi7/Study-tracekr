@@ -2,74 +2,61 @@ import streamlit as st
 import pandas as pd
 from datetime import date
 
+
 def app(storage):
-    st.markdown("<div class='card'><h3>Log Study Hours</h3>", unsafe_allow_html=True)
+    st.markdown("<h3>⏱️ Log Study Hours</h3>", unsafe_allow_html=True)
+
     user = st.session_state.get("user")
     if not user:
-        st.warning("Please login to log hours")
-        st.markdown("</div>", unsafe_allow_html=True)
+        st.warning("Please login to log hours.")
         return
-    uid = user.get("user_id")
-    plans = storage.read_csv("study_plans.csv")
-    logs = storage.read_csv("study_logs.csv")
-    if plans is None or plans.empty:
-        plans = pd.DataFrame(columns=["user_id","subject","goal","planned_hours","date"])
-    if logs is None or logs.empty:
-        logs = pd.DataFrame(columns=["user_id","date","subject","hours_studied"])
-    user_plans = plans[plans["user_id"]==uid] if "user_id" in plans.columns else pd.DataFrame()
-    with st.form("log"):
-        subj_list = ["--select--"]
-        if not user_plans.empty:
-            subj_list = sorted(user_plans["subject"].unique().tolist())
-        subject = st.selectbox("Subject", subj_list)
-        hours = st.number_input("Hours studied", min_value=0.0, step=0.25)
-        entry_date = st.date_input("Date", date.today())
-        submit = st.form_submit_button("Add Log")
-    if submit:
-        if subject=="--select--":
-            st.error("Choose a subject")
-        else:
-            row = {"user_id":uid,"date":str(entry_date),"subject":subject,"hours_studied":hours}
-            storage.append_row("study_logs.csv", row)
-            st.success("Logged")
-            st.rerun()
-    st.markdown("</div>", unsafe_allow_html=True)
-    st.markdown("<div style='height:12px'></div>", unsafe_allow_html=True)
-    st.markdown("<div class='card'><h4>Your Logs</h4>", unsafe_allow_html=True)
-    if logs is None or logs.empty:
-        st.info("No logs yet")
-    else:
-        user_logs = logs[logs["user_id"]==uid] if "user_id" in logs.columns else pd.DataFrame()
-        for i, r in user_logs.iterrows():
-            st.markdown(f"<div style='padding:10px;border-radius:8px;margin:8px 0;background:#fff8f6'><b>{r.get('subject')}</b><div class='small'>{r.get('date')} • {r.get('hours_studied')} hrs</div></div>", unsafe_allow_html=True)
-            cols = st.columns([1,1])
-            if cols[0].button("Edit", key=f"edit_log_{i}"):
-                st.session_state.edit_log = i
-                st.rerun()
-            if cols[1].button("Delete", key=f"del_log_{i}"):
-                storage.delete_row("study_logs.csv", i)
-                st.success("Deleted")
-                st.rerun()
-    st.markdown("</div>", unsafe_allow_html=True)
-    if "edit_log" in st.session_state:
-        idx = st.session_state.edit_log
-        logs = storage.read_csv("study_logs.csv")
-        if logs is None or logs.empty:
-            return
-        if idx in logs.index:
-            r = logs.loc[idx]
-            st.markdown("<div class='card'><h4>Edit Log</h4>", unsafe_allow_html=True)
-            with st.form("editlog"):
-                s = st.text_input("Subject", value=r.get("subject",""))
-                h = st.number_input("Hours", value=float(r.get("hours_studied",0.0)))
-                d = st.date_input("Date", value=pd.to_datetime(r.get("date")) if r.get("date") else None)
-                save = st.form_submit_button("Save")
-            if save:
-                logs.loc[idx,"subject"]=s
-                logs.loc[idx,"hours_studied"]=h
-                logs.loc[idx,"date"]=str(d)
-                storage.update_csv("study_logs.csv", logs)
-                del st.session_state["edit_log"]
-                st.success("Updated")
-                st.rerun()
-            st.markdown("</div>", unsafe_allow_html=True)
+
+    current_user_id = str(user.get("user_id"))
+
+    # 1. LOAD PLANS
+    plans_df = storage.read_csv("study_plans.csv")
+
+    # --- FIX: HANDLE MISSING PLANS GRACEFULLY ---
+    if plans_df.empty:
+        st.info("You don't have any study plans yet. Go to **Add Plan** to create one!")
+        return
+
+    # Ensure user_id is string for matching
+    plans_df["user_id"] = plans_df["user_id"].astype(str)
+
+    # Filter for CURRENT USER only
+    user_plans = plans_df[plans_df["user_id"] == current_user_id]
+
+    if user_plans.empty:
+        st.info("You don't have any study plans yet. Go to **Add Plan** to create one!")
+        return
+    # ---------------------------------------------
+
+    # 2. FORM TO LOG HOURS
+    with st.markdown("<div class='card'>", unsafe_allow_html=True):
+        with st.form("log_hours_form"):
+            # Select from active plans
+            selected_subject = st.selectbox("Select Subject", user_plans["subject"].unique())
+
+            c1, c2 = st.columns(2)
+            hours_studied = c1.number_input("Hours Studied", 0.1, 24.0, 1.0, 0.5)
+            study_date = c2.date_input("Date", value=date.today())
+
+            notes = st.text_area("Notes (optional)", placeholder="What did you cover?")
+
+            submitted = st.form_submit_button("✅ Save Log", type="primary")
+
+            if submitted:
+                # Prepare log entry
+                log_entry = {
+                    "user_id": current_user_id,
+                    "subject": selected_subject,
+                    "hours": hours_studied,
+                    "date": str(study_date),
+                    "notes": notes if notes else ""
+                }
+
+                # Use storage.append_row to save (it now handles the warning safely)
+                storage.append_row("study_logs.csv", log_entry)
+
+                st.success(f"Logged {hours_studied} hours for {selected_subject}!")

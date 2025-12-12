@@ -1,52 +1,63 @@
 import pandas as pd
 import os
 
+
 class Storage:
-    def __init__(self, base_path):
-        self.base_path = base_path
-        if not os.path.exists(base_path):
-            os.makedirs(base_path, exist_ok=True)
+    def __init__(self, data_dir="data"):
+        self.data_dir = str(data_dir)
+        os.makedirs(self.data_dir, exist_ok=True)
 
-    def _file_path(self, filename):
-        return os.path.join(self.base_path, filename)
+    def _get_path(self, filename):
+        return os.path.join(self.data_dir, filename)
 
-    def ensure_file(self, filename, headers):
-        path = self._file_path(filename)
+    def ensure_file(self, filename, columns):
+        """Creates a CSV with specific column headers if it doesn't exist."""
+        path = self._get_path(filename)
         if not os.path.exists(path):
-            df = pd.DataFrame(columns=headers)
+            # Create DataFrame with specific columns
+            df = pd.DataFrame(columns=columns)
             df.to_csv(path, index=False)
 
     def ensure_all_files_exist(self):
-        self.ensure_file("users.csv", ["user_id", "email", "hashed_password"])
-        self.ensure_file("study_plans.csv", ["user_id", "subject", "goal", "planned_hours", "date"])
-        self.ensure_file("study_logs.csv", ["user_id", "date", "subject", "hours_studied"])
+        """Creates basic study files with REQUIRED columns."""
+        # We explicitly define the columns here so pandas doesn't crash later
+
+        # 1. Study Logs (Fixes KeyError: 'hours_studied')
+        self.ensure_file("study_logs.csv", [
+            "user_id", "subject", "date", "hours_studied", "notes"
+        ])
+
+        # 2. Study Plans
+        self.ensure_file("study_plans.csv", [
+            "user_id", "subject", "goal_hours", "deadline", "status"
+        ])
 
     def read_csv(self, filename):
-        path = self._file_path(filename)
+        path = self._get_path(filename)
         if not os.path.exists(path):
-            return None
+            return pd.DataFrame()
+
         try:
             return pd.read_csv(path)
-        except Exception:
-            return None
+        except pd.errors.EmptyDataError:
+            return pd.DataFrame()
+        except Exception as e:
+            print(f"Error reading {filename}: {e}")
+            return pd.DataFrame()
 
     def write_csv(self, filename, df):
-        path = self._file_path(filename)
+        path = self._get_path(filename)
         df.to_csv(path, index=False)
 
     def append_row(self, filename, row_dict):
         df = self.read_csv(filename)
-        if df is None or df.empty:
-            df = pd.DataFrame(columns=row_dict.keys())
-        df = pd.concat([df, pd.DataFrame([row_dict])], ignore_index=True)
-        self.write_csv(filename, df)
+        new_row_df = pd.DataFrame([row_dict])
 
-    def update_csv(self, filename, df):
-        self.write_csv(filename, df)
+        if df.empty:
+            df = new_row_df
+        else:
+            # Handle empty columns or mismatches gracefully
+            new_row_df = new_row_df.dropna(axis=1, how='all')
+            df = pd.concat([df, new_row_df], ignore_index=True)
 
-    def delete_row(self, filename, index):
-        df = self.read_csv(filename)
-        if df is None or index not in df.index:
-            return
-        df = df.drop(index)
         self.write_csv(filename, df)

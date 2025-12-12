@@ -78,8 +78,6 @@ div[data-testid="stSidebarUserContent"] {
 .logout-container {
     margin-top: 50px; /* Standard spacing */
     width: 100%;      /* Full width */
-
-    /* ADD THESE 2 LINES: */
     border-top: 1px solid #e2e8f0;  /* This creates the line */
     padding-top: 15px;              /* Space BELOW the line */
 }
@@ -161,20 +159,16 @@ def login_action(email, pwd):
 
 
 def auth_page():
-    # --- CSS: REMOVE PADDING & ADJUST LAYOUT ---
     st.markdown("""
         <style>
-            /* Remove default top padding to prevent scrolling */
             .block-container {
                 padding-top: 1rem !important;
                 padding-bottom: 1rem !important;
             }
-            /* Ensure the title is tight against the top */
             h1 { padding-top: 0rem !important; }
         </style>
     """, unsafe_allow_html=True)
 
-    # --- HEADER ---
     st.markdown("""
         <div style="text-align: center; margin-bottom: 30px;">
             <div style="font-size: 32px; margin-bottom: 0px;">🎓</div>
@@ -184,13 +178,9 @@ def auth_page():
         </div>
     """, unsafe_allow_html=True)
 
-    # --- MAIN COLUMNS ---
-    # Changed ratio: Left side (5) is now much wider than Right side (3)
-    # Added gap="large" for better visual separation without using a spacer column
     col1, col2 = st.columns([5, 3], gap="large")
 
     with col1:
-        # Increased font size back to 2.8rem (bigger) since we have more width now
         st.markdown("""
             <div style="margin-top: 10px;">
                 <h2 style="font-size: 2.5rem; font-weight: 800; line-height: 1.1; color: #1e293b; margin-bottom: 15px;">
@@ -204,7 +194,6 @@ def auth_page():
             </div>
         """, unsafe_allow_html=True)
 
-        # Feature Highlights (Compact but readable)
         st.markdown("""
         <div style="display: flex; gap: 10px; flex-direction: column;">
             <div style="background-color:#f0f9ff; padding:12px; border-radius:8px; border-left: 5px solid #0ea5e9;">
@@ -222,7 +211,6 @@ def auth_page():
     with col2:
         mode = st.session_state.get("auth_mode", "login")
 
-        # Added a card-like effect for the login form
         with st.container(border=True):
             if mode == "login":
                 st.subheader("Sign In")
@@ -234,7 +222,7 @@ def auth_page():
                 if submitted:
                     ok, msg = login_action(email, pwd)
                     if ok:
-                        st.success(msg);
+                        st.success(msg)
                         st.rerun()
                     else:
                         st.error(msg)
@@ -258,7 +246,7 @@ def auth_page():
                 if submitted:
                     ok, msg = register_action(email, pwd, pwd2)
                     if ok:
-                        st.success(msg);
+                        st.success(msg)
                         st.rerun()
                     else:
                         st.error(msg)
@@ -270,6 +258,8 @@ def auth_page():
                 if c2.button("Log In", type="secondary", use_container_width=True):
                     st.session_state.auth_mode = "login"
                     st.rerun()
+
+
 def render_sidebar(user):
     with st.sidebar:
         st.markdown(f"""
@@ -283,67 +273,176 @@ def render_sidebar(user):
             </div>
         """, unsafe_allow_html=True)
 
-        menu = {"Home": "🏠", "Add Plan": "➕", "Log Hours": "⏱️", "Analytics": "📊", "Chatbot": "🤖"}
+        menu = {
+            "Home": "🏠",
+            "Chatbot": "🤖",
+            "Add Plan": "➕",
+            "Log Hours": "⏱️",
+            "Analytics": "📊"
+        }
+
         st.markdown('<p style="font-size: 12px; color: #94a3b8; font-weight: 600; margin-top: 20px;">MENU</p>',
                     unsafe_allow_html=True)
         current_page = st.session_state.get("page", "Home")
 
         for page_name, icon in menu.items():
             label = f"{icon}  {page_name}"
-            if page_name == current_page: label = f"🔵  {page_name}"
+            if page_name == current_page:
+                st.markdown(f"""
+                <style>
+                div[data-testid="stVerticalBlock"] button[kind="secondary"]:nth-of-type({list(menu.keys()).index(page_name) + 1}) {{
+                    background-color: #e0e7ff !important;
+                    color: #4338ca !important;
+                    border-left: 3px solid #4338ca !important;
+                }}
+                </style>
+                """, unsafe_allow_html=True)
+                label = f"🔹 {page_name}"
+
             if st.button(label, key=f"nav_{page_name}", use_container_width=True):
                 st.session_state.page = page_name
                 st.rerun()
 
-        # LOGOUT BUTTON - Full Width & Left Aligned
         st.markdown('<div class="logout-container">', unsafe_allow_html=True)
-        # Added use_container_width=True to fix alignment
         if st.button("🚪 Logout", key="logout_btn", use_container_width=True):
             st.session_state.clear()
             st.rerun()
         st.markdown('</div>', unsafe_allow_html=True)
 
 
+def delete_plan_callback(index):
+    """Deletes a plan by index AND its associated logs."""
+    # 1. READ PLANS
+    plans_df = storage.read_csv("study_plans.csv")
+
+    if plans_df is not None and index in plans_df.index:
+        # Get details BEFORE deleting to find matching logs
+        row = plans_df.loc[index]
+        subject_to_delete = str(row.get("subject", "")).strip().lower()
+        # Ensure user_id is string and cleaned
+        user_id_to_delete = str(row.get("user_id", "")).replace(".0", "")
+        original_name = row.get("subject", "Unknown")
+
+        # 2. DELETE PLAN
+        plans_df = plans_df.drop(index)
+        storage.write_csv("study_plans.csv", plans_df)
+
+        # 3. DELETE ASSOCIATED LOGS
+        logs_df = storage.read_csv("study_logs.csv")
+        if logs_df is not None and not logs_df.empty:
+            # Normalize columns
+            logs_df.columns = logs_df.columns.str.strip().str.lower()
+            if "userid" in logs_df.columns:
+                logs_df = logs_df.rename(columns={"userid": "user_id"})
+
+            if "user_id" in logs_df.columns and "subject" in logs_df.columns:
+                # Create temp columns for accurate matching
+                logs_df["_temp_uid"] = logs_df["user_id"].astype(str).str.replace(r'\.0$', '', regex=True)
+                logs_df["_temp_subj"] = logs_df["subject"].astype(str).str.strip().str.lower()
+
+                # Logic: Keep rows that do NOT match (User ID AND Subject)
+                # We remove rows where user_id matches AND subject matches
+                mask_keep = ~(
+                            (logs_df["_temp_uid"] == user_id_to_delete) & (logs_df["_temp_subj"] == subject_to_delete))
+
+                # Apply filter and drop temp columns
+                new_logs_df = logs_df[mask_keep].drop(columns=["_temp_uid", "_temp_subj"])
+
+                # Save only if changes occurred
+                if len(new_logs_df) < len(logs_df):
+                    storage.write_csv("study_logs.csv", new_logs_df)
+
+        st.toast(f"Plan and logs for '{original_name}' deleted!", icon="🗑️")
+
+
 def home_page():
     user = st.session_state.get("user")
+    uid = str(user.get("user_id")).replace('.0', '')  # Ensure string format matches logic
+
+    # --- HEADER ---
     st.markdown(f"""
         <h1 style='font-size: 2.5rem; margin-bottom: 0;'>Hello, {user.get("email").split('@')[0].title()} 👋</h1>
-        <p style='color: #64748b; margin-bottom: 40px;'>Here is your daily activity overview.</p>
+        <p style='color: #64748b; margin-bottom: 30px;'>Here is your daily activity overview.</p>
     """, unsafe_allow_html=True)
-    col1, col2, col3 = st.columns(3)
-    logs = storage.read_csv("study_logs.csv")
-    uid = user.get("user_id")
-    total_hours = 0.0
-    if logs is not None and not logs.empty:
-        user_logs = logs[logs["user_id"] == uid]
-        total_hours = user_logs["hours_studied"].sum() if not user_logs.empty else 0.0
-    with col1:
-        st.metric("Total Hours", f"{total_hours:.1f} h", delta="This Month")
-    with col2:
-        st.metric("Study Streak", "3 Days", delta="🔥 On Fire")
-    with col3:
-        st.metric("Pending Plans", "2", delta="-1 from yesterday", delta_color="inverse")
-    st.markdown("### 📅 Recent Study Plans", unsafe_allow_html=True)
+
+    # --- 1. QUICK ACTIONS ---
+    st.markdown("### 🚀 Quick Actions")
+    act1, act2, act3 = st.columns(3)
+
+    with act1:
+        with st.container(border=True):
+            st.markdown("#### ➕ Add Plan")
+            st.write("Schedule a session")
+            if st.button("Go to Planner", use_container_width=True):
+                st.session_state.page = "Add Plan"
+                st.rerun()
+
+    with act2:
+        with st.container(border=True):
+            st.markdown("#### ⏱️ Log Hours")
+            st.write("Track progress")
+            if st.button("Log Time", use_container_width=True):
+                st.session_state.page = "Log Hours"
+                st.rerun()
+
+    with act3:
+        with st.container(border=True):
+            st.markdown("#### 🤖 AI Tutor")
+            st.write("Ask doubts")
+            if st.button("Ask AI", use_container_width=True):
+                st.session_state.page = "Chatbot"
+                st.rerun()
+
+    st.markdown("---")
+
+    # --- 2. YOUR PLANS LIST (With Delete Button) ---
+    st.markdown("### 📅 Your Study Plans")
+
     plans = storage.read_csv("study_plans.csv")
-    if plans is not None and not plans.empty:
-        user_plans = plans[plans["user_id"] == uid].tail(3)
-        for index, row in user_plans.iterrows():
-            with st.container():
-                st.markdown(f"""
-                <div style="background: white; padding: 16px; border-radius: 12px; border: 1px solid #e2e8f0; margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center;">
-                    <div>
-                        <div style="font-weight: 600; color: #0f172a; font-size: 1.1rem;">{row['subject']}</div>
-                        <div style="color: #64748b; font-size: 0.9rem;">{row['goal']}</div>
-                    </div>
-                    <div style="text-align: right;">
-                        <div style="background: #e0e7ff; color: #4338ca; padding: 4px 12px; border-radius: 20px; font-size: 0.8rem; font-weight: 600;">
-                            {row['planned_hours']}h Planned
+
+    if plans is not None and not plans.empty and "user_id" in plans.columns:
+        # Filter for current user
+        plans["user_id"] = plans["user_id"].astype(str).str.replace(r'\.0$', '', regex=True)
+        user_plans = plans[plans["user_id"] == uid]
+
+        if not user_plans.empty:
+            # Sort by newest first
+            user_plans = user_plans.sort_index(ascending=False)
+
+            for index, row in user_plans.iterrows():
+                # We use a container with a border for the card look
+                with st.container(border=True):
+                    # Create 3 columns: Info (Wide) | Hours (Narrow) | Delete (Narrow)
+                    c_info, c_hours, c_action = st.columns([4, 2, 1])
+
+                    with c_info:
+                        st.markdown(f"**{row.get('subject', 'Untitled')}**")
+                        st.caption(row.get('goal', 'No description'))
+
+                    with c_hours:
+                        # Display hours with a nice badge look
+                        st.markdown(f"""
+                        <div style="background-color: #e0e7ff; color: #4338ca; padding: 4px 10px; 
+                                    border-radius: 15px; font-size: 0.85rem; text-align: center; font-weight: 600;">
+                            {row.get('planned_hours', 0)}h
                         </div>
-                    </div>
-                </div>
-                """, unsafe_allow_html=True)
+                        """, unsafe_allow_html=True)
+                        st.caption(f"📅 {row.get('date')}")
+
+                    with c_action:
+                        # The Delete Button
+                        # We use on_click so it happens BEFORE the app reloads
+                        st.button(
+                            "🗑️",
+                            key=f"home_del_{index}",
+                            help="Delete this plan",
+                            on_click=delete_plan_callback,
+                            args=(index,)
+                        )
+        else:
+            st.info("You don't have any active plans.")
     else:
-        st.info("No plans yet. Click 'Add Plan' to get started!")
+        st.info("No plans found. Click 'Add Plan' to get started!")
 
 
 def main():
