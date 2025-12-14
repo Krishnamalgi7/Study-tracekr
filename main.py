@@ -197,6 +197,9 @@ def login_action(email, pwd):
 
 
 def auth_page():
+    # Add a unique identifier based on session state to prevent duplicate forms
+    form_key_suffix = st.session_state.get("auth_form_id", 0)
+
     st.markdown("""
         <style>
             .block-container {
@@ -252,9 +255,9 @@ def auth_page():
         with st.container(border=True):
             if mode == "login":
                 st.subheader("Sign In")
-                with st.form("login_form"):
-                    email = st.text_input("Email", key="login_email")
-                    pwd = st.text_input("Password", type="password", key="login_pwd")
+                with st.form(key=f"login_form_{form_key_suffix}"):
+                    email = st.text_input("Email", key=f"login_email_{form_key_suffix}")
+                    pwd = st.text_input("Password", type="password", key=f"login_pwd_{form_key_suffix}")
                     submitted = st.form_submit_button("Sign In", use_container_width=True)
 
                 if submitted:
@@ -269,16 +272,18 @@ def auth_page():
                 c1, c2 = st.columns([1.5, 1])
                 c1.markdown("<div style='padding-top: 8px; font-size: 0.9rem; color: #64748b'>New here?</div>",
                             unsafe_allow_html=True)
-                if c2.button("Sign Up", type="secondary", use_container_width=True):
+                if c2.button("Sign Up", type="secondary", use_container_width=True,
+                             key=f"switch_signup_{form_key_suffix}"):
                     st.session_state.auth_mode = "signup"
+                    st.session_state.auth_form_id = st.session_state.get("auth_form_id", 0) + 1
                     st.rerun()
 
             else:
                 st.subheader("Create Account")
-                with st.form("signup_form"):
-                    email = st.text_input("Email", key="signup_email")
-                    pwd = st.text_input("Password", type="password", key="signup_pwd")
-                    pwd2 = st.text_input("Confirm", type="password", key="signup_pwd2")
+                with st.form(key=f"signup_form_{form_key_suffix}"):
+                    email = st.text_input("Email", key=f"signup_email_{form_key_suffix}")
+                    pwd = st.text_input("Password", type="password", key=f"signup_pwd_{form_key_suffix}")
+                    pwd2 = st.text_input("Confirm", type="password", key=f"signup_pwd2_{form_key_suffix}")
                     submitted = st.form_submit_button("Register", use_container_width=True)
 
                 if submitted:
@@ -293,8 +298,10 @@ def auth_page():
                 c1, c2 = st.columns([1.5, 1])
                 c1.markdown("<div style='padding-top: 8px; font-size: 0.9rem; color: #64748b'>Existing user?</div>",
                             unsafe_allow_html=True)
-                if c2.button("Log In", type="secondary", use_container_width=True):
+                if c2.button("Log In", type="secondary", use_container_width=True,
+                             key=f"switch_login_{form_key_suffix}"):
                     st.session_state.auth_mode = "login"
+                    st.session_state.auth_form_id = st.session_state.get("auth_form_id", 0) + 1
                     st.rerun()
 
 
@@ -420,9 +427,17 @@ def delete_plan_callback(index):
 
 import datetime
 
+import datetime
 
-def home_page():
+import datetime
+import streamlit as st
+
+
+def home_page(storage):
     user = st.session_state.get("user")
+    if not user:
+        return
+
     uid = str(user.get("user_id")).replace('.0', '')
 
     # Greeting Logic
@@ -480,7 +495,6 @@ def home_page():
     st.markdown("### 🚀 Quick Actions")
     c1, c2, c3 = st.columns(3)
 
-    # FIXED: The 'page' values now match your Main App logic directly
     actions = [
         ("📅", "Add Plan", "Add Plan", c1),
         ("⏱️", "Log Hours", "Log Hours", c2),
@@ -496,79 +510,106 @@ def home_page():
             </div>
             """, unsafe_allow_html=True)
 
-            # Button sends user DIRECTLY to the correct page name
             if st.button(f"Open {title}", key=f"btn_{title}", use_container_width=True):
                 st.session_state.page = page_name
                 st.rerun()
 
-    # YOUR PLANS SECTION
-    st.markdown("### 📚 Your Study Plans")
+    # YOUR PLANS SECTION - FILTER OUT LOGGED PLANS
+    st.markdown("### 📚 Your Active Study Plans")
     plans = storage.read_csv("study_plans.csv")
+    logs = storage.read_csv("study_logs.csv")
 
     if plans is not None and not plans.empty and "user_id" in plans.columns:
-        u_plans = plans[plans["user_id"].astype(str).str.replace(r'\.0$', '', regex=True) == uid]
+        # Get user's plans
+        u_plans = plans[plans["user_id"].astype(str).str.replace(r'\.0$', '', regex=True) == uid].copy()
 
         if not u_plans.empty:
-            for idx, row in u_plans.iterrows():
-                with st.container():
-                    st.markdown(f"""
-                    <div class="plan-card-container">
-                        <div style="flex-grow:1;">
-                            <strong style="color:#4338ca; font-size:1.1rem;">{row.get('subject')}</strong><br>
-                            <span style="color:#64748b;">{row.get('goal', 'No description')}</span>
-                        </div>
-                        <div style="text-align:right; margin-right:15px;">
-                            <span style="background:#e0e7ff; color:#3730a3; padding:4px 8px; border-radius:6px; font-size:0.8rem;">
-                                ⏳ {row.get('planned_hours')}h
-                            </span><br>
-                            <span style="font-size:0.8rem; color:#94a3b8;">{row.get('date')}</span>
-                        </div>
-                    </div>
-                    """, unsafe_allow_html=True)
+            # Get logged subjects for this user
+            logged_subjects = set()
+            if logs is not None and not logs.empty:
+                # Normalize column names
+                logs.columns = logs.columns.str.strip().str.lower()
+                if "userid" in logs.columns:
+                    logs = logs.rename(columns={"userid": "user_id"})
 
-                    # Delete logic (inline to avoid import issues)
-                    c_spacer, c_del = st.columns([6, 1])
-                    with c_del:
-                        if st.button("🗑️", key=f"del_{idx}"):
-                            plans = plans.drop(idx)
-                            storage.write_csv("study_plans.csv", plans)
-                            st.toast("Plan Deleted!")
-                            st.rerun()
+                if "user_id" in logs.columns and "subject" in logs.columns:
+                    # Get logs for current user
+                    user_logs = logs[logs["user_id"].astype(str).str.replace(r'\.0$', '', regex=True) == uid]
+
+                    # Extract unique subjects that have been logged
+                    logged_subjects = set(user_logs["subject"].astype(str).str.strip().str.lower().unique())
+
+            # Filter out plans that have been logged
+            active_plans = u_plans[~u_plans["subject"].astype(str).str.strip().str.lower().isin(logged_subjects)]
+
+            if not active_plans.empty:
+                for idx, row in active_plans.iterrows():
+                    with st.container():
+                        st.markdown(f"""
+                        <div class="plan-card-container">
+                            <div style="flex-grow:1;">
+                                <strong style="color:#4338ca; font-size:1.1rem;">{row.get('subject')}</strong><br>
+                                <span style="color:#64748b;">{row.get('goal', 'No description')}</span>
+                            </div>
+                            <div style="text-align:right; margin-right:15px;">
+                                <span style="background:#e0e7ff; color:#3730a3; padding:7px 8px; border-radius:6px; font-size:0.8rem;">
+                                    ⏳ {row.get('planned_hours')}h
+                                </span><br>
+                                <span style="font-size:0.8rem; color:#94a3b8;">{row.get('date')}</span>
+                            </div>
+                        </div>
+                        """, unsafe_allow_html=True)
+
+                        c_spacer, c_del = st.columns([16, 1])
+                        with c_del:
+                            if st.button("🗑️", key=f"del_{idx}"):
+                                plans = plans.drop(idx)
+                                storage.write_csv("study_plans.csv", plans)
+                                st.toast("Plan Deleted!")
+                                st.rerun()
+            else:
+                st.success("🎉 All plans have been logged! Great work!")
+                st.info("Add new plans or check **Analytics** to see your progress.")
         else:
-            st.info("No active plans.")
+            st.info("No active plans. Click **Add Plan** to get started!")
     else:
-        st.info("No plans found.")
+        st.info("No plans found. Click **Add Plan** to create your first study plan!")
 
 
 def main():
+    # Initialize session state
     if "page" not in st.session_state:
         st.session_state.page = "Home"
     if "auth_mode" not in st.session_state:
         st.session_state.auth_mode = "login"
+    if "auth_form_id" not in st.session_state:
+        st.session_state.auth_form_id = 0
+
     user = st.session_state.get("user", None)
+
+    # If not logged in, show auth page
     if not user:
         auth_page()
-        return
+        return  # IMPORTANT: Stop here, don't continue
+
+    # Only execute this if user is logged in
     render_sidebar(user)
-    if st.session_state.page == "Home":
-        home_page()
-    elif st.session_state.page == "Add Plan":
-        st.markdown('<div class="main-content">', unsafe_allow_html=True)
+
+    # Route to correct page
+    current_page = st.session_state.page
+
+    if current_page == "Home":
+        home_page(storage)
+    elif current_page == "Add Plan":
         importlib.import_module("pages.1_Add_Plan").app(storage)
-        st.markdown('</div>', unsafe_allow_html=True)
-    elif st.session_state.page == "Log Hours":
-        st.markdown('<div class="main-content">', unsafe_allow_html=True)
+    elif current_page == "Log Hours":
         importlib.import_module("pages.2_Log_Hours").app(storage)
-        st.markdown('</div>', unsafe_allow_html=True)
-    elif st.session_state.page == "Analytics":
-        st.markdown('<div class="main-content">', unsafe_allow_html=True)
+    elif current_page == "Analytics":
         importlib.import_module("pages.3_Analytics").app(storage)
-        st.markdown('</div>', unsafe_allow_html=True)
-    elif st.session_state.page == "Chatbot":
-        st.markdown('<div class="main-content">', unsafe_allow_html=True)
+    elif current_page == "Chatbot":
         importlib.import_module("pages.4_Chatbot").app(storage)
-        st.markdown('</div>', unsafe_allow_html=True)
 
 
 if __name__ == "__main__":
     main()
+
