@@ -174,30 +174,33 @@ def register_action(email, pwd, pwd2):
         return False, "Email and password required"
     if pwd != pwd2:
         return False, "Passwords do not match"
-    ok = auth.register(email, pwd)
-    if not ok:
-        return False, "Account already exists"
-    user = auth.login(email, pwd)
+
+    success, msg = auth.register(email, pwd)
+    if not success:
+        return False, msg
+
+    user, login_msg = auth.login(email, pwd)
     if user:
         st.session_state.user = user
         st.session_state.page = "Home"
-        return True, "Account created successfully!"
+        return True, msg
     return False, "Registration failed"
 
 
 def login_action(email, pwd):
     if not email or not pwd:
         return False, "Email and password required"
-    user = auth.login(email, pwd)
+
+    user, msg = auth.login(email, pwd)
     if not user:
-        return False, "Invalid credentials"
+        return False, msg
+
     st.session_state.user = user
     st.session_state.page = "Home"
     return True, "Welcome back!"
 
 
 def auth_page():
-    # Add a unique identifier based on session state to prevent duplicate forms
     form_key_suffix = st.session_state.get("auth_form_id", 0)
 
     st.markdown("""
@@ -207,6 +210,25 @@ def auth_page():
                 padding-bottom: 1rem !important;
             }
             h1 { padding-top: 0rem !important; }
+
+            .password-requirements {
+                background: #f8fafc;
+                border-left: 3px solid #6366f1;
+                padding: 10px 12px;
+                border-radius: 6px;
+                margin: 10px 0;
+                font-size: 0.85rem;
+            }
+
+            .password-requirements ul {
+                margin: 5px 0;
+                padding-left: 20px;
+            }
+
+            .password-requirements li {
+                color: #64748b;
+                margin: 3px 0;
+            }
         </style>
     """, unsafe_allow_html=True)
 
@@ -256,8 +278,10 @@ def auth_page():
             if mode == "login":
                 st.subheader("Sign In")
                 with st.form(key=f"login_form_{form_key_suffix}"):
-                    email = st.text_input("Email", key=f"login_email_{form_key_suffix}")
-                    pwd = st.text_input("Password", type="password", key=f"login_pwd_{form_key_suffix}")
+                    email = st.text_input("Email", key=f"login_email_{form_key_suffix}",
+                                          placeholder="user@example.com")
+                    pwd = st.text_input("Password", type="password", key=f"login_pwd_{form_key_suffix}",
+                                        placeholder="••••••••")
                     submitted = st.form_submit_button("Sign In", use_container_width=True)
 
                 if submitted:
@@ -280,10 +304,27 @@ def auth_page():
 
             else:
                 st.subheader("Create Account")
+
+                # Password requirements info
+                st.markdown("""
+                    <div class="password-requirements">
+                        <strong>Password Requirements:</strong>
+                        <ul>
+                            <li>At least 8 characters</li>
+                            <li>Contains letters (a-z, A-Z)</li>
+                            <li>Contains numbers (0-9)</li>
+                            <li>Contains special characters (!@#$%...)</li>
+                        </ul>
+                    </div>
+                """, unsafe_allow_html=True)
+
                 with st.form(key=f"signup_form_{form_key_suffix}"):
-                    email = st.text_input("Email", key=f"signup_email_{form_key_suffix}")
-                    pwd = st.text_input("Password", type="password", key=f"signup_pwd_{form_key_suffix}")
-                    pwd2 = st.text_input("Confirm", type="password", key=f"signup_pwd2_{form_key_suffix}")
+                    email = st.text_input("Email", key=f"signup_email_{form_key_suffix}",
+                                          placeholder="user@example.com")
+                    pwd = st.text_input("Password", type="password", key=f"signup_pwd_{form_key_suffix}",
+                                        placeholder="Strong@Pass123")
+                    pwd2 = st.text_input("Confirm Password", type="password", key=f"signup_pwd2_{form_key_suffix}",
+                                         placeholder="Strong@Pass123")
                     submitted = st.form_submit_button("Register", use_container_width=True)
 
                 if submitted:
